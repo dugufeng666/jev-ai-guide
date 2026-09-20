@@ -22,7 +22,7 @@ export async function SiteHeader({ locale }: { locale: string }) {
       <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-4">
           <Link href={localizeHref("/", locale)} className="flex items-center gap-3">
-            <img src="/android-chrome-192x192.png" alt="" className="h-9 w-9 rounded-xl" />
+            <img src="/android-chrome-192x192.png" alt="Jev AI Guides logo" className="h-9 w-9 rounded-xl" />
             <span className="text-sm font-bold tracking-wide text-foreground">Jev AI Guides</span>
           </Link>
           <nav className="hidden items-center gap-1 md:flex">
