@@ -1,0 +1,134 @@
+export const metadata = {
+  "title": "Jev AI vs Claude: A Practical Model Selection Guide",
+  "description": "Compare Jev AI vs Claude for structured decisions, open-ended writing, confidence, speed, cost, limitations, and practical model selection workflows today.",
+  "category": "comparisons",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## Jev AI vs Claude at a glance
+
+**Jev AI vs Claude** is primarily a choice between a specialized decision model and a generative language model, not a contest for one universal winner. In a **Jev AI vs Claude** workflow, use Jev for bounded judgments with predefined outcomes and use Claude when the task requires writing, explanation, code interpretation, or open-ended synthesis. Available evidence also suggests Jev can offer lower latency and cost on suitable decision gates, but one independent experiment is not proof that it will outperform Claude on every dataset.
+
+| Choose Jev when you need | Choose Claude when you need |
+|---|---|
+| One answer from a known set of outcomes | Original prose or an explanation |
+| A probability attached to a bounded judgment | Broader analysis across complex evidence |
+| High-volume classification or routing | Code interpretation and written feedback |
+| Confidence-based escalation to a human | An answer that cannot be represented by fixed options |
+
+The practical lesson is to classify the task before selecting the model. Asking which model is “better” without defining the expected output hides the most important architectural decision.
+
+## Understand the core model difference
+
+TypeSafe positions Jev 1.13 as a System One model for fast, common-sense judgments. It operates through structured primitives such as `Choice`, which selects among predefined outcomes, and `Noul`, which evaluates whether a statement is true and returns a probability. It is not intended to behave like a general-purpose chatbot or writing model.
+
+The supplied comparison describes Claude Sonnet as a frontier generative model. In that experiment, Claude could process the same bounded evidence packet as Jev, but the broader workflow also involved code reading, technical analysis, and prose generation. Those open-ended responsibilities remained appropriate for a generative model, according to the [independent Jev and Claude comparison](https://dev.to/bengreenberg/jev-vs-claude-who-wins-4mln).
+
+| Dimension | Jev 1.13 | Claude in the supplied experiment |
+|---|---|---|
+| Model role | Structured System One decisions | Generative language and analysis |
+| Expected answer shape | Predefined choice, score, or probability | Open-ended text or a requested structured answer |
+| Suitable examples | Classification, routing, verification gates | Writing, synthesis, code analysis, explanations |
+| Text generation | Officially documented as a poor fit | Used for prose in the broader judging workflow |
+| Uncertainty handling | Probabilities and confidence are part of its decision primitives | Confidence was measured by the independent evaluator |
+| Full repository analysis | Not supported by the supplied evidence | Used for broader code-related analysis in the cited workflow |
+
+This distinction prevents a common mistake in **Jev AI vs Claude** comparisons: treating structured decision quality and generative quality as the same capability. A model that writes polished explanations may be unnecessary for a three-option gate. Conversely, a model that efficiently selects among three states cannot automatically produce the detailed review that follows.
+
+Jev therefore does not replace Claude across an application. It can replace or supplement a generative model at specific points where the answer space is bounded and the surrounding system can act on probabilities.
+
+## Match the model to the task
+
+A useful **Jev AI vs Claude** evaluation starts by writing down the output contract. If the acceptable answers can be enumerated before the request is sent, Jev may fit. If the output must be composed after interpreting broad context, Claude is the more appropriate option based on the supplied evidence.
+
+Use the following process to route a task.
+
+1. Define the required result. Specify whether the system needs a category, a yes-or-no judgment, a score, an explanation, or newly written text.
+
+2. Enumerate valid outcomes. A task with choices such as `billing`, `technical_support`, and `sales` is structurally different from a request to draft a personalized support response.
+
+3. Separate judgment from computation. Keep arithmetic, counting, and date comparisons in application code. Give the model only the semantic decision that ordinary code cannot resolve reliably.
+
+4. Reduce the evidence. Send the fields relevant to the current decision instead of an entire record, document collection, or repository.
+
+5. Decide how uncertainty will be handled. Establish a confidence threshold and route uncertain cases to review rather than forcing every model output into automation.
+
+6. Test representative edge cases. Include missing evidence, ambiguous wording, negative examples, conflicting details, and adversarial content before deployment.
+
+| Example task | Recommended approach | Reason |
+|---|---|---|
+| Route a support request to one known team | Jev candidate | The possible destinations can be predefined |
+| Decide whether evidence is satisfied, not satisfied, or insufficient | Jev candidate | The task is a bounded policy judgment |
+| Draft a response to the customer | Claude candidate | The result requires generated prose |
+| Interpret implementation quality and explain a score | Claude candidate | The task combines analysis with explanation |
+| Count matching records | Application code | TypeSafe advises keeping counting out of Jev |
+| Determine which date is earlier | Application code | Jev reads dates as text rather than ordered values |
+| Make a decision and then write a report | Hybrid workflow | Jev can handle the gate while Claude handles prose |
+
+The hybrid row is often the most useful conclusion. For example, Jev could classify whether a submission has enough evidence to proceed. Claude could then analyze qualifying material and prepare a written brief. The application, rather than either model, should enforce thresholds, compute totals, and maintain the audit trail.
+
+## Interpret the available benchmark carefully
+
+The strongest supplied **Jev AI vs Claude** comparison is an independent test involving 102 anonymized buildathon submissions. Each system received the same evidence packet and four-step decision procedure. Every configuration ran three times, producing 306 decisions per variant.
+
+The task was intentionally narrow: assign each submission to `satisfied`, `not_satisfied`, or `insufficient_evidence`. It did not test general writing, complete repository analysis, or every feature of either model.
+
+| Reported result | Jev configuration | Claude Sonnet 5 with high reasoning |
+|---|---:|---:|
+| Accuracy | 100.0% with Choice plus four diagnostic Nouls | 99.0% |
+| Median latency | 378 ms | 3,554 ms |
+| Estimated cost for 10,000 evaluations | $2.27 | $129.74 |
+| Expected Calibration Error | 0.037 | 0.058 |
+| Automated share at the stated Jev threshold | 98% at 100% accuracy among automated decisions | Not reported |
+
+These are the evaluator’s findings, not Jev AI Guides' benchmark results. The reported cost difference was about 57 times, while Claude’s median latency was approximately 9.4 times higher for this specific decision gate. Pricing, configurations, prompts, and model versions can change, so these figures should be treated as a case study rather than a universal forecast.
+
+The error patterns are more instructive than the headline accuracy. Jev Choice alone made two errors, both in a low confidence range of 0.2 to 0.3. Claude made three errors that fell in the evaluator’s 0.9 to 1.0 confidence bin. In that dataset, a Jev confidence threshold of 0.5 would have sent the uncertain 2% to review while preserving perfect accuracy among automated cases.
+
+The same experiment also warns against decomposing every policy into isolated model questions. Jev Choice alone reached 99.3%, and Choice with four diagnostic Nouls reached 100%. A hand-coded reconstruction based on those Nouls fell to 94.1% and created six false passes.
+
+That result does not mean application logic is undesirable. It means independent semantic judgments may not preserve the ordering and interaction of a policy. Use code for exact operations and enforcement, while testing whether a policy should be evaluated as one bounded decision or several independent ones.
+
+A [community video about Jev comparisons](https://www.youtube.com/watch?v=D4a3ip-S8OM) also demonstrates interest in visual comparisons involving security, support routing, and lead qualification. Its examples can inspire test cases, but creator demonstrations should not be treated as controlled benchmarks or production guarantees.
+
+## Design around Jev’s documented limits
+
+Any responsible **Jev AI vs Claude** decision must include Jev’s known failure modes. The official [Jev 1.13 jaggedness documentation](https://docs.typesafe.ai/model-jaggedness/jev-1.13.md) says the model can be literal, lose accuracy with irrelevant context, struggle with numerical precision, and perform poorly on tasks involving multiple layers of indirection.
+
+Apply these safeguards when building a Jev decision step:
+
+- Write the exact condition instead of relying on implied intent.
+- Define boundary cases in the criteria.
+- Phrase instructions and criteria so they ask for the same outcome.
+- Filter irrelevant state before sending the request.
+- Keep counting, arithmetic, and exact comparisons in code.
+- Extract date components separately and compare real dates in code.
+- Avoid double negatives and multi-hop instructions.
+- Test adversarial or self-promotional text that could influence classification.
+- Tune thresholds separately for each primitive and use case.
+- Use a generative model when the required output is original text.
+
+Do not assume probabilities from different question formats are interchangeable. TypeSafe documents that a yes-or-no `Choice` and a `Noul` can produce numbers that look comparable while answering different questions. A Choice selects relatively among available options; separate Nouls evaluate statements independently and do not have to sum to one.
+
+The official documentation also cautions against expecting arithmetic consistency between a question and its negation. Consequently, an application should not infer that the probability of “not X” must equal one minus the probability of “X.” Ask each decision directly, validate it on representative data, and enforce genuine mathematical identities in code.
+
+These constraints clarify the **Jev AI vs Claude** boundary. Jev is appropriate when developers can define a concise state, an explicit policy, and bounded outcomes. Claude remains appropriate when the system must generate language or work through broader material that cannot be reduced without losing essential meaning.
+
+## Jev AI vs Claude FAQ
+
+### Is Jev AI better than Claude?
+
+Not in every category. Jev is designed for structured decisions, while Claude is used for generative and analytical tasks in the supplied comparison. Jev performed better on accuracy, latency, cost, and calibration in one narrow decision experiment, but that does not establish superiority across writing, coding, or open-ended reasoning.
+
+### Can Jev replace Claude in an application?
+
+Jev can replace Claude for some bounded decision steps, but the evidence does not support replacing a generative model throughout an application. A practical architecture may use Jev for classification or policy gates, Claude for explanations and prose, and application code for exact calculations.
+
+### What should I test before choosing Jev AI vs Claude?
+
+Create a labeled dataset from the actual workflow. Measure task-specific accuracy, false passes, false flags, latency, cost, consistency, and whether low confidence identifies unsafe cases. Include incomplete, ambiguous, contradictory, irrelevant, and adversarial inputs instead of testing only straightforward examples.
+
+### Should Jev handle math, counting, or dates?
+
+No, not when application code can compute the answer exactly. TypeSafe’s documentation recommends performing arithmetic, counting, and date comparison in code. Jev should handle the semantic judgment around those values only when a model is genuinely needed.

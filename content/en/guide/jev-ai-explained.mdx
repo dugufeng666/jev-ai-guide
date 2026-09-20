@@ -1,0 +1,127 @@
+export const metadata = {
+  "title": "Jev AI Explained: A Practical Guide to Structured Decisions",
+  "description": "Jev AI explained: learn how TypeSafe's System One model turns state and typed questions into fast, structured decisions, plus use cases and key limits.",
+  "category": "guide",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## Jev AI Explained in Plain English
+
+Jev AI explained simply: Jev is TypeSafe AI's flagship System One model, designed to turn supplied state into typed decisions and probabilities instead of generating prose. For readers searching for "jev ai explained," the essential distinction is that software can use its constrained Choice, Score, and Noul answers directly. Unlike a chat model, Jev is not intended to write articles, compose replies, or perform open-ended generation.
+
+TypeSafe describes Jev as its first System One model. An application sends a state, such as a support ticket or account record, along with one or more typed questions. Jev evaluates those questions and returns structured answers that code can compare, rank, or use for routing decisions, according to the [TypeSafe introduction](https://docs.typesafe.ai/introduction.md).
+
+| Capability | Jev | Generative chat model |
+|---|---|---|
+| Primary purpose | Make structured judgments about supplied state | Generate and reason through open-ended text |
+| Typical output | Typed selections, scores, or probabilities | Tokens forming prose or structured text |
+| Answer space | Constrained by the question definition | Potentially open-ended |
+| Suitable work | Classification, routing, scoring, and decision gates | Writing, conversation, explanation, and complex reasoning |
+| Role in software | Supplies a decision that code can act on | Produces content or handles tasks requiring generation |
+
+This is a design difference, not evidence that Jev is universally better than an LLM. Jev is specialized for bounded decisions, while generative models remain necessary when an application must create text or work through extended reasoning.
+
+## Jev AI Explained: Input and Output
+
+A Jev request has two central concepts: the state and the questions. The state is the information being evaluated. It can contain text or structured data, but TypeSafe recommends sending only information relevant to the decisions being made.
+
+Questions define the required output shape. Every question has an identifier, a type, and instructions. Choice and Score questions also include criteria, while Noul may include criteria clarifying what yes and no mean. The official [TypeSafe primitives documentation](https://docs.typesafe.ai/primitives.md) notes that question identifiers are used by the application and are not sent to the model, so the instructions must contain the complete question.
+
+| Primitive | Use it when | Returned information |
+|---|---|---|
+| Choice | One option must be selected from a fixed, unordered set | Selected choice, probability distribution, and confidence |
+| Score | The result belongs on an ordered scale | Score, level legend, probability distribution, and confidence |
+| Noul | The question has a clear yes-or-no interpretation | Probability from 0 to 1 that the statement is true |
+
+A Choice question could route a ticket among billing, technical support, and sales. A Score question could place customer frustration on an ordered scale with explicitly defined levels. A Noul question could estimate the probability that a customer is requesting a refund.
+
+Noul does not have a separate confidence field. A value near 1 indicates a strong yes, a value near 0 indicates a strong no, and a value near 0.5 reflects uncertainty. This probability should not be mistaken for a position on a spectrum. For example, a Noul value of 0.5 for "Is this person highly experienced?" does not mean the person has medium experience; a Score with defined experience levels would better represent that question.
+
+Multiple questions about the same state can be submitted together. TypeSafe says they are evaluated in parallel and independently, so one question's answer does not become hidden context for another. Its documentation also reports that batching 13 questions in one illustrated workflow was 9.6 times faster and 11.5 times cheaper than making 13 separate calls, although those figures describe that documented example rather than a universal performance guarantee.
+
+## Jev AI Explained Tutorial: Ticket Triage
+
+Consider a support system receiving this state: a customer says an API integration is returning server errors and preventing orders from being processed. The application needs to identify the responsible department, detect urgency, and estimate frustration.
+
+The workflow can be designed in five steps:
+
+1. Include the ticket message and any policy or account fields that directly affect classification.
+2. Define a Choice for the responsible department.
+3. Define a Noul asking whether the message conveys immediate urgency.
+4. Define a Score with clear, ordered frustration levels.
+5. Send all three questions in one request and apply business rules to the typed results.
+
+The questions should each ask for one focused judgment. TypeSafe specifically advises against broad instructions such as asking the model to analyze a message and determine the best overall action. Complex decisions should be decomposed into atomic questions, with the results combined in deterministic code.
+
+| Workflow step | Model responsibility | Application responsibility |
+|---|---|---|
+| Prepare state | Evaluate the supplied evidence | Retrieve, filter, and structure relevant fields |
+| Classify department | Select among defined options | Map each option to a queue or handler |
+| Detect urgency | Return a yes probability | Choose and validate an escalation threshold |
+| Score frustration | Evaluate defined ordered levels | Decide how the score affects priority |
+| Execute an action | None | Apply permissions, policies, logging, and review rules |
+
+Suppose the department Choice favors technical support, the urgency Noul is high, and the frustration Score is elevated. Code could prioritize the ticket and route it to the technical queue. The threshold for automatic escalation should be selected by the application owner and validated against representative data; the supplied sources do not prescribe a universal threshold.
+
+For structured state, instructions can identify relevant fields with explicit paths, such as `ticket.messages[0].text` or `refund_policy`. This reduces ambiguity about which evidence the question should use. It also makes the request easier to inspect when a classification appears wrong.
+
+When a decision depends on several independent considerations, create separate questions and combine them in code. Ticket priority, for example, might depend on business impact, urgency, and the quality of diagnostic evidence. Keeping those dimensions separate lets a team adjust weights without rewriting a broad prompt.
+
+Questions that truly depend on earlier answers require another request. TypeSafe recommends a second call only when code must use the first answer to fetch new state, construct different state, or determine the options for the next question. Otherwise, ask the questions together and ignore answers that are not needed.
+
+## Where Jev Fits in an AI Stack
+
+Jev is best treated as one component in a hybrid system. Deterministic code should continue to handle arithmetic, date comparison, database operations, permissions, and exact policy enforcement. Jev can supply bounded judgments, while a generative LLM handles writing and genuinely open-ended reasoning.
+
+A practical division of work is:
+
+- Use code for facts and operations that can be calculated exactly.
+- Use Jev for focused classification, scoring, routing, or decision gates.
+- Use a generative model when the system must explain, converse, or create new text.
+- Use human review when uncertainty or business risk exceeds an approved tolerance.
+
+LangChain's guide documents a `TypeSafeClassifier` integration and experimental middleware patterns for model routing and pre-execution tool checks. It presents Jev as a complement to an agent's generative model, not a replacement for it. See LangChain's [guide to building a harness with Jev](https://www.langchain.com/blog/building-a-harness-with-jev) for the documented integration examples.
+
+That architecture also limits the consequences of a bad classification. Jev can recommend a route or provide a probability, but ordinary application code should still own authorization and execution. High-impact actions should not depend on a single untested model output.
+
+Structured output removes the need to recover an option from generated prose, but structural validity is not the same as semantic correctness. A valid Choice can still select the wrong option. Teams therefore need labeled evaluations, monitored outcomes, and an escalation path before using results in consequential workflows.
+
+## Jev AI Explained: Limits and Safeguards
+
+TypeSafe publishes a model-specific limitations page for `jev-1.13`, last reviewed September 17, 2026. These caveats matter because Jev's constrained output does not eliminate errors in judgment. The official [Jev 1.13 jaggedness guide](https://docs.typesafe.ai/model-jaggedness/jev-1.13.md) identifies literal interpretation, numeric weakness, indirection, irrelevant context, and adversarial content among the known failure modes.
+
+| Limitation | Practical response |
+|---|---|
+| Literal interpretation | State the exact condition and define boundary cases |
+| Counting and arithmetic | Calculate in code rather than asking Jev |
+| Date and time comparison | Extract components if needed, then compare dates in code |
+| Complex indirection | Reduce reasoning hops and point directly to relevant state |
+| Irrelevant context | Filter the state before sending it |
+| Adversarial content | Treat state as untrusted and test hostile examples |
+| Contradictory criteria | Align instructions and option definitions |
+| Text generation | Use a generative model instead |
+
+Do not assume probabilities from differently framed questions obey simple arithmetic identities. TypeSafe warns that asking whether a condition is true and separately asking whether its negation is true may not produce values that sum to one. Similarly, a Noul and a yes-or-no Choice are different question forms, so a threshold tuned for one should not automatically be reused for the other.
+
+Score values also should not be used to reconstruct an exact number between levels. The documented model version is intended to judge semantic categories, not perform precise numerical interpolation.
+
+A responsible rollout should begin with a fixed evaluation set containing routine, ambiguous, contradictory, and adversarial examples. Record the returned distributions, compare decisions with approved labels, and choose thresholds based on the cost of false positives and false negatives. Re-run that evaluation when the model version, state format, instructions, criteria, or business policy changes.
+
+## Jev AI Explained FAQ
+
+### What does "Jev AI explained" mean in simple terms?
+
+It refers to understanding Jev as a structured decision model rather than a chatbot. An application supplies state and typed questions, and Jev returns bounded answers and probabilities that software can use directly.
+
+### Is Jev a replacement for a large language model?
+
+No. Jev does not generate open-ended text. It is designed for classification, scoring, routing, and other structured judgments. A generative LLM remains appropriate for writing, conversation, and extended reasoning.
+
+### Which Jev primitive should I use?
+
+Use Choice for one option from a known set, Score for an ordered spectrum, and Noul for a well-defined yes-or-no probability. Choose the type whose result maps most directly to the code path you need.
+
+### Can Jev make production decisions automatically?
+
+It can provide structured signals for automation, but deployment rules remain the application's responsibility. Validate the model on representative data, keep exact computation and authorization in code, monitor errors, and escalate uncertain or high-impact cases for human review.

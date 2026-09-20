@@ -1,0 +1,160 @@
+export const metadata = {
+  "title": "Jev AI Agents: A Practical Guide to Decision Loops",
+  "description": "Learn how jev ai agents support fast, typed decisions for routing and guardrails, with a source-backed LangChain tutorial, practical limits, and examples.",
+  "category": "agent",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What Jev AI Agents Actually Do
+
+Jev AI agents use TypeSafe AI's Jev model as a fast decision layer inside an agent workflow, returning typed classifications and probabilities instead of generated prose. In practice, Jev AI agents can classify requests, route work, or assess proposed tool calls while a conventional language model handles open-ended reasoning and writing.
+
+Jev is described as a System One model: a model designed to evaluate a supplied state and answer structured questions. It does not produce a normal chat response. According to [LangChain's guide to building a harness with Jev](https://www.langchain.com/blog/building-a-harness-with-jev), applications receive typed answers that can be used directly in program logic.
+
+That distinction matters because an agent often makes several decisions before completing a task. A typical loop asks a model what to do, executes a tool, evaluates the result, and repeats. Calling a generative model at every stage can add latency and cost even when the decision is only a classification.
+
+| Capability | Jev | Generative chat model |
+|---|---|---|
+| Primary role | Structured decision-making | Reasoning and text generation |
+| Typical output | Typed answers and probabilities | Generated text or structured output |
+| Open-ended writing | Not supported | Supported |
+| Parallel questions | Supported within one request | Not established by the supplied sources |
+| Suggested agent role | Routing, classification, and guardrails | Complex reasoning and communication |
+
+Jev therefore should not be treated as a replacement for an agent's main language model. The useful pattern is narrower: give deterministic operations to ordinary code, structured judgment calls to Jev, and open-ended reasoning or communication to a generative model.
+
+## How the Jev Decision Layer Works
+
+A Jev request has two central parts. The state contains the information to evaluate, while the questions define the decisions the application needs. The state may be text, structured data, or LangChain messages, according to the [LangChain integration guide](https://www.langchain.com/blog/building-a-harness-with-jev).
+
+Jev was trained using reinforcement learning for calibrated decisions, abbreviated RLCD. The intended result is not merely a label, but a probability or confidence value that software can consider when deciding what happens next.
+
+The integration exposes three decision primitives:
+
+| Primitive | Purpose | Source-backed example |
+|---|---|---|
+| Noul | Estimate whether a statement is true | Determine whether a message is urgent |
+| Choice | Select among defined options | Choose one route from a fixed set |
+| Score | Evaluate ordered levels | Rate an input as low, medium, or high |
+
+A Noul result is useful for a yes-or-no condition, but it is represented as a probability rather than a bare Boolean. In LangChain's urgency example, a support message is evaluated against the instruction asking whether it needs immediate attention. The application can then interpret the returned probability according to its own policy.
+
+Choice is appropriate when the valid outcomes are known in advance. An agent might need to select a model tier or workflow branch from a defined set. Score is intended for ordered judgments, with a continuous score, an underlying distribution, and a confidence value.
+
+Multiple questions can be evaluated against the same state in one request. LangChain reports that Jev processes those questions in parallel, with little effect on response time beyond the tokens added by the questions. The supplied material does not document maximum question counts, context limits, or rate limits, so an implementation should not assume specific values.
+
+A practical Jev AI agents workflow can be summarized as follows:
+
+| Stage | Component | Responsibility |
+|---|---|---|
+| 1. Collect context | Application code | Assemble the relevant text, data, or messages |
+| 2. Define decisions | Developer | Express bounded questions as Noul, Choice, or Score |
+| 3. Evaluate state | Jev | Return typed results and probabilities |
+| 4. Apply policy | Application code | Compare results with business rules |
+| 5. Continue work | Agent, tool, or person | Route, execute, request review, or invoke an LLM |
+
+The model supplies a probabilistic assessment. Your application remains responsible for deciding what probability is sufficient for a particular action.
+
+## Tutorial: Add Jev to a LangChain Workflow
+
+The source-backed integration uses the `langchain-typesafe` package and a `TYPESAFE_API_KEY`. The supplied source does not provide account setup instructions, installation command syntax, availability terms, or API limits, so those details should be confirmed separately before implementation.
+
+LangChain exposes Jev through `TypeSafeClassifier`. The following example is adapted directly from the [documented classifier example](https://www.langchain.com/blog/building-a-harness-with-jev):
+
+```python
+from langchain_typesafe import Noul, TypeSafeClassifier
+
+classifier = TypeSafeClassifier()
+
+response = classifier.invoke(
+    state=(
+        "The deploy failed twice and customers are seeing 500s. "
+        "Can someone look now?"
+    ),
+    questions={
+        "urgent": Noul(
+            instructions="Does this need attention right now?"
+        ),
+    },
+)
+
+urgency = response.nouls["urgent"].noul
+```
+
+This call asks one bounded question about the supplied state. It does not ask Jev to explain the incident, repair the deployment, or draft a customer response. The result stored in `urgency` is a probability that the condition is true.
+
+The next step belongs in application policy. A team might use the value to prioritize a queue, request human review, or choose another workflow. No universal threshold is documented in the supplied sources, so thresholds should be selected and evaluated for the specific task rather than copied from an example.
+
+For a production-oriented implementation, follow these steps:
+
+1. Identify one repeated decision currently delegated to a full chat model.
+2. Confirm that all permitted outcomes can be defined before inference.
+3. Supply only the state needed to make that decision.
+4. Write a focused instruction for each Noul, Choice, or Score question.
+5. Keep the returned probability or confidence in the agent state.
+6. Apply an explicit policy for low-confidence or high-impact cases.
+7. Evaluate classifications against labeled examples before automating actions.
+
+The LangChain article also documents experimental model-routing middleware. `ModelRouterMiddleware` uses criteria associated with named model choices, then selects a model based on the latest user message. The probabilities and confidence remain available in agent state.
+
+This pattern can help Jev AI agents reserve a more capable model for difficult work while directing simpler requests elsewhere. However, the supplied source uses illustrative model identifiers and does not establish that those identifiers are available to every developer. Treat the example as integration guidance, not as a model availability list.
+
+## Where Jev Fits in an Agent
+
+Jev is best matched to bounded decisions whose outputs are known in advance. It is a weaker fit when the application needs a detailed explanation, creative response, long-form analysis, or a plan that cannot be represented by predefined choices.
+
+| Agent task | Jev's supported role | What still needs another component |
+|---|---|---|
+| Ticket prioritization | Estimate whether a request is urgent | Queue policy and any written reply |
+| Model routing | Choose among defined model options | The selected model performs the task |
+| Tool-call review | Classify a proposed action as risky | Application code blocks or permits execution |
+| Ordered assessment | Return a score and confidence | Policy determines the response |
+| Open-ended support reply | Classify context before generation | A generative model writes the response |
+
+One documented guardrail pattern is `AutoModeMiddleware`. The LangChain guide says it uses Jev to evaluate potentially risky tool calls and can block a call before execution. Its example applies the middleware to a `bash` tool.
+
+That is a useful architecture, but it should not be interpreted as proof that every dangerous action will be detected. The same source explicitly notes that agents remain untrustworthy and can receive harmful instructions. A classifier is one control in a larger security design, not a substitute for tool permissions, isolation, validation, logging, and human approval.
+
+The supplied sources also describe broader community examples, including browser-use agents, email triage, and a live trading agent. These are reported examples rather than independently verified results. This tutorial does not recommend financial automation, and those mentions do not establish safety, profitability, or production readiness.
+
+A community video claims up to 193.6 times faster workflow performance and response times between 70 and 500 milliseconds. Separately, LangChain attributes claims of up to 200 times faster inference and 400 times lower cost on classification tasks to TypeSafe AI. These are reported benchmarks, not results independently reproduced by Jev AI Guides, and they should not be generalized beyond the evaluated classification workloads.
+
+## Limits and Deployment Checklist
+
+The main limitation is deliberate: Jev does not generate text. Jev AI agents still need a language model when a task requires writing, broad reasoning, conversational interaction, or an answer outside predefined options.
+
+Typed output also solves only one class of failure. A response may conform perfectly to the expected type while still being an incorrect classification. Probabilities can inform policy, but they do not remove the need for task-specific evaluation.
+
+Before deploying a Jev-backed decision, review these boundaries:
+
+| Question | Why it matters |
+|---|---|
+| Are the allowed outcomes fully defined? | Jev is intended for bounded, structured decisions |
+| Is the state sufficient and relevant? | Missing context can produce a plausible but wrong classification |
+| What happens when confidence is low? | Ambiguous cases need a fallback such as review or another model |
+| Can the action cause material harm? | High-impact actions require stronger controls than one classifier |
+| Has the decision been evaluated on representative data? | Reported general benchmarks do not establish accuracy for your task |
+| Is a written explanation required? | Jev does not provide open-ended text generation |
+
+The evidence supplied for this article does not specify pricing terms, API quotas, context limits, regional availability, data retention, service-level commitments, or stable package versions. Those operational details should remain open questions during technical review.
+
+For Jev AI agents, the most defensible starting point is a low-impact classification with a visible fallback. Measure decision quality, inspect uncertain cases, and preserve the option to send work to a person or a more capable model.
+
+## FAQ
+
+### Are Jev AI agents complete autonomous agents?
+
+No. Jev provides structured decisions that can be inserted into an agent loop. Tools, application state, execution policies, and usually a generative model are still needed to complete broader tasks.
+
+### Can Jev replace the main language model?
+
+Not for writing or open-ended reasoning. Jev is designed for typed classifications and probabilistic decisions, while a generative chat model remains appropriate for explanations, planning, and user-facing text.
+
+### What decision types does Jev support?
+
+The supplied LangChain guide documents Noul for true-or-false probabilities, Choice for selection among defined options, and Score for ordered evaluations. It also says several questions can be evaluated against one state in a single request.
+
+### Are the reported speed and cost gains guaranteed?
+
+No. LangChain reports company claims of up to 200 times faster inference and 400 times lower cost than comparable LLMs on classification tasks. Actual performance will depend on the workload and implementation, and the supplied sources do not provide enough benchmark methodology to predict production results.

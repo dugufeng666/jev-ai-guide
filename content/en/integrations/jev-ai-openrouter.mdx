@@ -1,0 +1,141 @@
+export const metadata = {
+  "title": "Jev AI OpenRouter: A Guide to Structured Decisions",
+  "description": "Use Jev AI OpenRouter to build decision workflows with Noul, Choice, and Score questions, calibrated probabilities, setup steps, and practical limits.",
+  "category": "integrations",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What Jev AI OpenRouter Does
+
+Jev AI OpenRouter connects TypeSafe's structured evaluation model to OpenRouter's Decisions API, letting an application evaluate a supplied state through typed questions and receive probabilities instead of generated prose. Use Jev AI OpenRouter for narrow tasks such as routing, ranking, verification, and risk assessment, not for chat or open-ended writing.
+
+OpenRouter lists the model as `typesafe/jev-1.13`. Its model page states that Jev accepts a string, object, or array as the state and answers three question types: Noul, Choice, and Score. The application then decides how to use those answers. See the [OpenRouter Jev 1.13 model page](https://openrouter.ai/typesafe/jev-1.13) for the current model listing and quick start.
+
+Cloudflare independently documents TypeSafe Jev as a structured evaluation model with the same three question types. Its examples show customer-support routing, refund review, and account-risk assessment. Cloudflare uses the model identifier `typesafe/jev`, which is specific to its Workers AI integration rather than the OpenRouter setup covered here.
+
+| Capability | Source-backed behavior |
+|---|---|
+| Model ID on OpenRouter | `typesafe/jev-1.13` |
+| Input | A state represented as a string, object, or array |
+| Questions | Noul, Choice, and Score |
+| Output | Typed answers with probabilities and applicable confidence data |
+| OpenRouter interface | Decisions API |
+| OpenAI-compatible chat endpoint | Not supported for this model |
+| Best-fit work | Routing, ranking, verification, and other structured decisions |
+| Open-ended text generation | Not supported |
+
+The critical distinction is that Jev does not compose a customer reply, policy explanation, or article. It evaluates information that your application supplies. A separate generative model or conventional template system is still necessary when the workflow must produce user-facing prose.
+
+## Understand the Three Question Types
+
+A useful Jev AI OpenRouter request begins with a well-defined state. That state can be a support message, a structured order record, an account-event history, or another collection of facts relevant to the decision.
+
+Each question needs a stable key, a type, instructions, and criteria where applicable. The keys become fields in the returned `answers` object, so choose names that remain understandable in logs and application code.
+
+| Question type | What it evaluates | Returned information | Suitable example |
+|---|---|---|---|
+| Noul | A yes-or-no proposition | A probability from 0 for no to 1 for yes | Whether a ticket is urgent |
+| Choice | One option from named categories | Selected choice, probability distribution, and confidence | Which department should receive a ticket |
+| Score | Position on an ordered rubric | Numeric score, legend, probability distribution, and confidence | How severe an account risk appears |
+
+### Noul
+
+A Noul question asks whether a proposition is true. OpenRouter describes its result as a probability between 0 and 1 rather than a Boolean value. A result of `0.81`, for example, represents stronger support for yes than a result of `0.55`, but your application still owns the threshold and resulting action.
+
+This format is useful when a hard true-or-false response would hide uncertainty. The OpenRouter quick start demonstrates checking whether urgency exceeds `0.8` before taking an escalation action. That threshold is an example from the supplied documentation, not a universal recommendation.
+
+### Choice
+
+A Choice question defines named options and explains what each option means. In Cloudflare's support-routing example, the options include account, billing, technical, and other. The documented response selects one category while also exposing probabilities for the available alternatives.
+
+Those probabilities are operationally useful. A workflow can automatically route a high-confidence result while sending an ambiguous result to a general queue. The model supplies the evaluation; your code defines the policy.
+
+### Score
+
+A Score question uses an ordered list, such as low, moderate, and high risk. The documented response includes a numeric position, a legend connecting indexes to rubric labels, probabilities across those labels, and a confidence value.
+
+Treat the ordering as meaningful. Criteria should progress consistently from one level to the next instead of mixing unrelated categories. The [Cloudflare Jev documentation](https://developers.cloudflare.com/ai/models/typesafe/jev/index.md) shows the complete input and output structure for all three types.
+
+## Set Up a Jev AI OpenRouter Request
+
+Start by creating an API key in the OpenRouter dashboard and placing it in the `OPENROUTER_API_KEY` environment variable. Keep that key on the server; it should not be embedded in browser code, committed to a repository, or exposed through client-side configuration.
+
+OpenRouter's documented TypeScript path uses the `@openrouter/sdk` package and constructs an `OpenRouter` client. The request is made with `openrouter.alpha.decisions.create`, with the model, state, and questions nested under `decisionsRequest`.
+
+This is different from a standard chat-completions integration. Replacing a chat model name with `typesafe/jev-1.13` will not work because the request and response contracts are specific to the Decisions API.
+
+| Step | Required action | Key detail |
+|---|---|---|
+| 1 | Create an OpenRouter API key | Store it as an environment variable |
+| 2 | Initialize the documented OpenRouter SDK | Use the API key on the server |
+| 3 | Select the model | Set `model` to `typesafe/jev-1.13` |
+| 4 | Supply the state | Use a relevant string, object, or array |
+| 5 | Define typed questions | Choose Noul, Choice, or Score |
+| 6 | Submit through the Decisions API | Use `openrouter.alpha.decisions.create` in the documented SDK |
+| 7 | Inspect `decision.answers` | Validate each answer's type before acting |
+
+For a support-routing workflow, the state might be the customer's message. A Noul question could evaluate urgency, a Choice question could select the responsible department, and a Score question could estimate frustration on an ordered rubric.
+
+After receiving the response, access the answer by the same key used in the request. Check its `type` before reading type-specific fields such as `noul`, `choice`, `score`, or `probabilities`. The official OpenRouter example performs these checks before applying its routing condition.
+
+Optional OpenRouter headers can identify an application for OpenRouter leaderboards, according to the model page. They are not required to make the documented decision request.
+
+## Turn Probabilities Into Workflow Rules
+
+Jev AI OpenRouter returns evidence for a decision, but it does not define business policy. Your application must determine thresholds, fallback behavior, audit requirements, and which actions require human approval.
+
+Consider a billing support workflow. A result could indicate that a message is urgent, select billing as the department, and place frustration near the upper end of a rubric. The application might route the ticket immediately while reserving refunds or account changes for separate policy checks.
+
+Use the following implementation pattern:
+
+1. Define the business outcome before writing the question.
+2. Include only state that is relevant to that outcome.
+3. Make Choice categories distinct and collectively useful.
+4. Write Score criteria in a clear, ordered progression.
+5. Record the returned probabilities with the model identifier.
+6. Establish an uncertainty range that triggers manual review.
+7. Test representative, ambiguous, and contradictory states.
+8. Monitor incorrect decisions and revise criteria or thresholds.
+
+The supplied Cloudflare examples illustrate why state design matters. Its refund example includes the ticket, duplicate captured charges, and the refund policy. The questions separately evaluate whether a refund was requested and whether the policy supports it. This separation is easier to audit than combining every concern into one broad question.
+
+| Use case | Suggested question type | Supported source example |
+|---|---|---|
+| Detect stated urgency | Noul | Payout failure support message |
+| Route a support request | Choice | Account, billing, technical, or other |
+| Assess ordered risk | Score | Low, moderate, or high account risk |
+| Decide whether to escalate | Noul | Manual security review decision |
+| Check refund-policy support | Noul | Duplicate-charge refund review |
+
+Do not interpret a probability as authorization to perform an irreversible action. For security restrictions, refunds, account deletion, or other consequential operations, add deterministic validation and an appropriate review path. This is workflow guidance rather than a capability claimed by the model documentation.
+
+## Costs, Performance, and Important Limits
+
+At the supplied source snapshot, OpenRouter reported a weighted average input price of `$0.0418` per million tokens and a weighted average output price of `$0` per million tokens. The page also displayed `0.22 s` P50 latency for the best provider, along with 99.99% three-day uptime and 99.97% three-day availability.
+
+These figures are time-sensitive observations from the OpenRouter listing, not fixed guarantees. Check the [current OpenRouter pricing and provider data](https://openrouter.ai/typesafe/jev-1.13) before estimating cost or setting service-level expectations.
+
+OpenRouter also stated that the model was hosted by one provider at the time of collection. That means the page had no provider-routing choice to make for this model, even though OpenRouter generally discusses recovering through another provider when one is available and request filters permit it.
+
+Cloudflare lists a 32,000-token context window for its `typesafe/jev` offering. That figure is documented for Cloudflare's model endpoint and should not be assumed to establish an OpenRouter limit without confirmation from OpenRouter.
+
+The main functional limit is more important than the snapshot metrics: Jev is a structured decision model. Jev AI OpenRouter does not replace a generative chat model for drafting, summarizing, explaining, or conducting an open-ended conversation. A complete system may use Jev to select an action and another component to execute or communicate it.
+
+## Jev AI OpenRouter FAQ
+
+### Can I call Jev through a normal chat-completions client?
+
+No. OpenRouter explicitly says `typesafe/jev-1.13` uses its Decisions API and that chat-completions SDK request shapes will not work. Use the documented decision method and process the typed `answers` response.
+
+### What does Noul mean in a Jev response?
+
+Noul is Jev's yes-or-no question type. It returns a probability from 0 to 1, where values closer to 1 indicate stronger support for yes. Your application must choose the threshold and action.
+
+### Is the Cloudflare model ID interchangeable with the OpenRouter ID?
+
+No assumption of interchangeability is supported. OpenRouter documents `typesafe/jev-1.13`, while Cloudflare documents `typesafe/jev` for Workers AI. Their examples corroborate Jev's structured evaluation behavior, but each platform has its own interface and identifier.
+
+### Is Jev AI OpenRouter suitable for customer support?
+
+It can support structured parts of a customer-service workflow, including urgency detection, department routing, and frustration scoring. It does not write the customer response, and production rules should account for uncertain results, incorrect classifications, and actions that require human review.

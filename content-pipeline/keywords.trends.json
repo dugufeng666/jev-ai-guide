@@ -1,0 +1,84 @@
+{
+  "topic_name": "jev ai",
+  "categories": [
+    {
+      "category": "guide",
+      "keywords": [
+        "jev ai explained",
+        "jev ai tutorial",
+        "jev ai beginner guide",
+        "jev ai how to use",
+        "jev ai full tutorial",
+        "jev ai no hype"
+      ]
+    },
+    {
+      "category": "model",
+      "keywords": [
+        "jev ai model",
+        "jev ai decision model",
+        "jev ai classification model",
+        "jev ai system one",
+        "jev ai structured output"
+      ]
+    },
+    {
+      "category": "api",
+      "keywords": [
+        "jev ai api",
+        "jev ai docs",
+        "jev ai pricing",
+        "jev ai quickstart",
+        "jev ai sdk"
+      ]
+    },
+    {
+      "category": "typesafe",
+      "keywords": [
+        "jev ai typesafe",
+        "jev ai typesafe ai",
+        "jev ai diogo almeida",
+        "jev ai rlcd",
+        "jev ai github"
+      ]
+    },
+    {
+      "category": "agent",
+      "keywords": [
+        "jev ai agent",
+        "jev ai agents",
+        "jev ai browser agent",
+        "jev ai automation",
+        "jev ai claude code"
+      ]
+    },
+    {
+      "category": "integrations",
+      "keywords": [
+        "jev ai vercel",
+        "jev ai openrouter",
+        "jev ai cloudflare",
+        "jev ai nodejs",
+        "jev ai rust"
+      ]
+    },
+    {
+      "category": "comparisons",
+      "keywords": [
+        "jev ai vs chatgpt",
+        "jev ai vs claude",
+        "jev ai vs llm",
+        "jev ai faster than llms"
+      ]
+    },
+    {
+      "category": "community",
+      "keywords": [
+        "jev ai reddit",
+        "jev ai youtube",
+        "jev ai use cases",
+        "jev ai fake demos"
+      ]
+    }
+  ]
+}

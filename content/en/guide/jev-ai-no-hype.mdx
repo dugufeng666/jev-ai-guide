@@ -1,0 +1,137 @@
+export const metadata = {
+  "title": "Jev AI No Hype: A Practical Guide to Structured AI",
+  "description": "Jev AI no hype guide: learn how TypeSafe's structured decision model works, choose Choice, Score, or Noul, design workflows, and understand its limits.",
+  "category": "guide",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## Jev AI no hype: what it actually means
+
+A Jev AI no hype assessment starts with a narrow definition: Jev is a TypeSafe model for making fast, typed judgments that software can consume, not a general-purpose chatbot. The practical Jev AI no hype approach is to use it for bounded decisions such as classification, scoring, routing, and yes-or-no evaluation. It does not replace a generative model when you need original writing, explanations, code generation, or other open-ended text.
+
+TypeSafe calls Jev its first “System One” model. The name refers to fast, focused judgments rather than extended reasoning. You send the model a state, define one or more typed questions, and receive values and probability distributions that application code can evaluate directly. See the [official TypeSafe introduction](https://docs.typesafe.ai/introduction.md) for the underlying model concept.
+
+The most important distinction is the output contract:
+
+| Capability | Jev | Generative language model |
+| --- | --- | --- |
+| Primary output | Typed values and probabilities | Generated text |
+| Answer space | Defined before the request | Potentially open-ended |
+| Typical software use | Classify, score, route, or branch | Draft, explain, summarize, or converse |
+| Parsing generated prose | Not required for supported primitives | Often required for structured workflows |
+| Open-ended writing | Not supported | A core use case |
+| Best task shape | Focused judgment over supplied state | Text generation or broader reasoning |
+
+This comparison describes design goals, not universal superiority. TypeSafe’s announcement reports major speed and cost advantages on its workflow evaluations, but it also says those gains may be at the high end of real-world results. Those figures come from TypeSafe’s own evaluations rather than independent testing, so they should be treated as vendor-reported evidence. The company discusses its methodology and qualifications in the [Jev announcement](https://typesafe.ai/blog/introducing-system-one-models-and-jev).
+
+## Understand Jev's three decision primitives
+
+A useful Jev AI no hype workflow begins by selecting the output shape your program actually needs. Jev exposes three primitives: Choice, Score, and Noul. Questions of different types can be submitted together against the same state, according to the [TypeSafe primitives documentation](https://docs.typesafe.ai/primitives.md).
+
+| Primitive | Use it when | Returned information |
+| --- | --- | --- |
+| Choice | One option must be selected from a fixed, unordered list | Selected choice, option probabilities, and confidence |
+| Score | A judgment belongs on an ordered scale | Score, level legend, probabilities, and confidence |
+| Noul | You need the probability that a statement is true | A value from 0 to 1 |
+
+### Choice
+
+Use Choice for categories that map to distinct code paths. A support request, for example, might be routed to billing, technical support, or sales.
+
+The criteria should describe every option clearly. When the available options may not cover all inputs, TypeSafe recommends including an “other” or “none of the above” option. That gives the model a valid output without forcing an unrelated category.
+
+### Score
+
+Use Score when the answer belongs on a spectrum. Appropriate examples from the documentation include customer frustration, bug severity, and skill level.
+
+Each level needs a meaningful description. A scale such as “low, medium, high” provides less guidance than descriptions tied to observable evidence. The returned score can fall between defined levels, but TypeSafe warns against treating that interpolation as an exact numerical measurement.
+
+### Noul
+
+Use Noul for a direct yes-or-no judgment when the probability is useful. A value near 1 favors yes, a value near 0 favors no, and a value near 0.5 indicates uncertainty.
+
+Noul does not have a separate confidence field. It should not be used to represent a medium level on a scale. For example, a 0.5 probability that a candidate is “strong in Python” does not mean the candidate has intermediate Python ability. Use Score when measuring ability and Noul when testing a clearly defined condition.
+
+## Build a small Jev workflow step by step
+
+Consider a customer-support workflow that must identify refund requests, determine the main request type, and assess frustration. This follows the request pattern shown in TypeSafe’s official documentation without assuming access to the service or claiming production results.
+
+| Step | What to do | Why it matters |
+| --- | --- | --- |
+| 1 | Define the software decision | Prevents an open-ended prompt from replacing application logic |
+| 2 | Supply only relevant state | Reduces distraction from unrelated content |
+| 3 | Split the decision into atomic questions | Keeps each judgment focused |
+| 4 | Choose the matching primitive | Produces an answer your code can use directly |
+| 5 | Submit independent questions together | Lets Jev evaluate them in parallel |
+| 6 | Apply thresholds and business rules in code | Keeps policy and deterministic logic under developer control |
+| 7 | Test errors, uncertainty, and adversarial inputs | Reveals where automation should stop |
+
+First, define the state. It could contain a ticket message and the relevant refund policy. Structured fields are preferable when the application already has structured data because instructions can point to specific paths, such as `ticket_message` or `refund_policy`.
+
+Next, write one question for each judgment:
+
+- A Noul can ask whether `ticket_message` requests a refund.
+- A Choice can classify the main request as refund, rebooking, or information.
+- A Score can assess frustration using explicitly described levels.
+
+The official Python SDK pattern uses `TypeSafeClient` and calls `client.system_one` with `state` and `questions`. Questions are represented by `Choice`, `Score`, and `Noul` objects. Consult the [official primitives example](https://docs.typesafe.ai/primitives.md) for the supported request structure rather than inferring parameters from third-party examples.
+
+Each question in one request sees the same state but is evaluated independently. An answer from one question does not become hidden context for another. That means you can combine the outputs in ordinary application code, but you should not assume that one question will reason from another question’s result.
+
+A practical Jev AI no hype implementation might automate only high-confidence cases. Your code could route an obvious technical issue automatically while sending ambiguous requests to a person. The sources explain that probabilities and confidence can support thresholds, but they do not prescribe a universal cutoff. Thresholds must be selected and validated for the specific workflow.
+
+## Put reasoning and arithmetic in the right place
+
+Jev works best when the model supplies semantic judgment and conventional code supplies deterministic computation. This boundary is central to a Jev AI no hype architecture.
+
+Suppose ticket priority depends on bug severity, customer frustration, and the quality of the diagnostic information. Do not hide all three factors inside a single instruction such as “assign a priority.” Ask three focused Score questions, then apply your organization’s weights in code.
+
+This has two practical benefits. The individual judgments are easier to inspect, and policy changes do not require rewriting one complicated prompt. If severity becomes more important, the application can change a coefficient while leaving the model questions stable.
+
+The same division applies to counting, dates, and arithmetic. Use code to count matching records, compare timestamps, calculate durations, or enforce totals. Use Jev only where interpretation is necessary.
+
+A second request is justified when a later question genuinely depends on an earlier result. For example, the first response might identify which records to retrieve, after which the application can assemble a new state for another judgment. If every question can operate on the original state, the documentation recommends asking them together.
+
+TypeSafe also describes speculative fan-out: ask all potentially useful independent questions in one request, then let code ignore answers that do not apply. This is possible because the questions are evaluated independently and in parallel. It should still be balanced against the shared request token budget and the need to exclude irrelevant state.
+
+## Know the documented limits before automating
+
+The strongest Jev AI no hype guidance comes from TypeSafe’s own limitations page. The page applies specifically to `jev-1.13` and was last reviewed on September 17, 2026. Later models may behave differently, so model-specific documentation should be checked before deployment.
+
+| Documented limitation | Risk | Recommended response |
+| --- | --- | --- |
+| Literal interpretation | The model may answer the wording rather than the intended meaning | State exact conditions and boundary cases |
+| Unreliable counting and arithmetic | Numeric results may be wrong | Calculate in code |
+| Weak date comparison | Ordering and durations may be unreliable | Extract components, then compare in code |
+| Difficulty with indirection | Multi-hop or double-negative instructions may reduce accuracy | Point directly to relevant fields |
+| Irrelevant context | Large states can distract the model | Filter the state before sending it |
+| Adversarial content | Input text may influence the judgment improperly | Use precise criteria and test hostile cases |
+| Structural inconsistency | Related questions may not obey expected probability identities | Enforce relationships in code |
+| No text generation | Chained choices are a poor substitute for writing | Use a generative model |
+
+These limitations are detailed in the [official Jev 1.13 jaggedness guide](https://docs.typesafe.ai/model-jaggedness/jev-1.13.md).
+
+Typed output also needs careful interpretation. TypeSafe says schema matching is guaranteed, meaning Jev should not return an unsupported type or an option outside the defined answer space. That does not prove every judgment is semantically correct. A valid Choice can still select the wrong category, and a valid probability can still be unsuitable for a particular business threshold.
+
+Likewise, TypeSafe’s statement that Jev “can’t hallucinate” is tied to its constrained output design. Jev does not generate arbitrary prose that must be parsed back into a schema. The more precise Jev AI no hype conclusion is that structured output removes one class of failure, while documented judgment errors, literal readings, and adversarial influence remain possible.
+
+Before automating a consequential action, build a representative evaluation set. Include ordinary cases, ambiguous examples, missing information, contradictory evidence, boundary conditions, and deliberately manipulative text. Measure errors at the thresholds your application will actually use, and preserve a human-review path for uncertain or high-impact decisions.
+
+## FAQ
+
+### What does “Jev AI no hype” mean?
+
+Jev AI no hype means evaluating Jev according to its documented role: a model for fast, structured judgments over supplied state. It is useful for bounded classification, scoring, routing, and probability-based decisions. It is not positioned as a replacement for chat models that write or generate open-ended content.
+
+### Can Jev replace a generative LLM?
+
+No. Jev gives up text generation in exchange for constrained, typed outputs. Use a generative model for writing, explanations, free-form extraction, or open-ended reasoning. Use Jev when the possible outputs can be defined before the request and consumed directly by code.
+
+### Does typed output guarantee a correct decision?
+
+No. It guarantees the shape and permitted answer space, according to TypeSafe’s documentation. The selected answer can still be wrong or uncertain. Applications should test representative cases, set workflow-specific thresholds, and escalate decisions when the risk or uncertainty is too high.
+
+### What should developers avoid asking Jev to do?
+
+Avoid open-ended generation, exact arithmetic, counting, date comparison, deeply indirect reasoning, and judgments buried in irrelevant context. Keep each question focused, send only relevant state, and place deterministic operations and policy enforcement in ordinary code.

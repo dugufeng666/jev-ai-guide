@@ -1,0 +1,134 @@
+export const metadata = {
+  "title": "Jev AI Vercel Integration: A Source-Grounded Guide",
+  "description": "Learn what the Jev AI Vercel listing confirms, how Jev structures Noul, Choice, and Score evaluations, and what to verify before you build an integration.",
+  "category": "integrations",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What the Jev AI Vercel listing actually offers
+
+The Jev AI Vercel listing confirms that TypeSafe's structured evaluation model is available through Vercel AI Gateway, but the supplied listing does not document a complete request. A Jev AI Vercel integration is therefore best approached by separating what Vercel confirms from the model contract documented by Cloudflare.
+
+Vercel identifies TypeSafe AI as the provider and labels Jev's price as free. The page also warns that promotional pricing ends on September 25, 2026, so that label should not be treated as a permanent pricing commitment. It presents controls for getting an API key and reading the documentation, along with this AI SDK import:
+
+`import { experimental_evaluate as evaluate } from 'ai';`
+
+That single line establishes an evaluation-oriented AI SDK entry point, but it does not show the arguments, model identifier, authentication configuration, or returned TypeScript type. Those details should be checked in the current documentation reached from the [Vercel Jev model page](https://vercel.com/ai-gateway/models/jev) before implementation.
+
+| Vercel listing detail | What is confirmed | What remains unconfirmed |
+| --- | --- | --- |
+| Provider | TypeSafe AI | Provider-specific routing options |
+| Displayed price | Free | Pricing after the promotion |
+| Promotion notice | Ends September 25, 2026 | Future price or billing unit |
+| SDK surface | `experimental_evaluate` is imported from `ai` | Complete call signature and configuration |
+| Access | The page offers an API-key action | Rate limits and account eligibility |
+| Availability | Vercel checks availability for the user's team | Universal access across all teams |
+
+The narrow evidence matters. It supports a practical discovery and design guide, but not a copy-and-paste Vercel application that could be represented as tested or production-ready.
+
+## Understand Jev's structured evaluation contract
+
+Jev is not presented as a conventional chatbot. The [Cloudflare Jev documentation](https://developers.cloudflare.com/ai/models/typesafe/jev/index.md) describes it as TypeSafe's structured evaluation model: an application supplies one state and a collection of typed questions, and Jev returns structured answers with probability or confidence information.
+
+The state can be plain text or structured data. Cloudflare's examples include a customer message, an order and refund policy, and an account record containing recent security events. This allows the evidence being judged to stay separate from the questions applied to it.
+
+Each question has a name chosen by the developer. That stable name becomes the key used to find its answer in the response.
+
+| Question type | Supported input pattern | Documented result |
+| --- | --- | --- |
+| Noul | Instructions with optional true and false criteria | A numeric `noul` value |
+| Choice | Named options, each with a criterion | Selected choice, confidence, and probabilities |
+| Score | An ordered array of criteria | Numeric score, confidence, legend, and probabilities |
+
+A Noul question is demonstrated with true and false criteria. For example, the source asks whether a support message conveys urgency and defines what should count as true or false. Its answer contains a numeric Noul value rather than a plain Boolean.
+
+A Choice question asks the model to select among named alternatives. In the support-routing example, those alternatives include account, billing, technical, and other. The response includes the selected key, an overall confidence value, and a probability for every candidate.
+
+A Score question uses ordered criteria. Cloudflare demonstrates a three-level frustration scale and a low-to-high account-risk scale. The response includes a numeric score, a legend connecting indices to the supplied criteria, confidence, and probabilities for the individual levels.
+
+The model page reports a 32,000-token context window for Cloudflare's `typesafe/jev` offering. That figure is useful evidence about the Cloudflare-hosted model, but it should not automatically be presented as the Jev AI Vercel limit. Gateway-specific limits must be verified on Vercel.
+
+## Plan a Jev AI Vercel integration
+
+Start by defining the decision, not by assembling a general-purpose prompt. Jev's documented interface is organized around state, questions, instructions, and criteria, so a good integration begins with an explicit contract for each result your application needs.
+
+| Step | Implementation task | Reason |
+| --- | --- | --- |
+| 1 | Open the Vercel model page and check team availability | Availability is displayed dynamically |
+| 2 | Review the current price and promotion notice | The documented free price is time-sensitive |
+| 3 | Obtain credentials through Vercel's API-key flow | Requests require gateway access |
+| 4 | Define the state supplied for evaluation | Jev evaluates one state at a time |
+| 5 | Choose Noul, Choice, or Score for each question | The type controls the answer structure |
+| 6 | Write explicit instructions and criteria | Criteria define the meanings of available outcomes |
+| 7 | Confirm the current AI SDK invocation | The supplied Vercel source shows only an import |
+| 8 | Validate every returned answer before application use | Responses differ by question type |
+
+For a support-routing workflow, the state might be the customer's message. The question could use Choice with department keys that match the application's routing destinations. Each criterion should explain the boundary of that department, as shown in Cloudflare's account, billing, technical, and other example.
+
+For a policy review, the state can be structured. Cloudflare's refund example combines ticket details, order charges, and the applicable policy. It then asks separate Noul questions about whether a refund was requested and whether the policy supports it. This illustrates how one state can support several related evaluations without combining them into an ambiguous output.
+
+For risk triage, Score can represent ordered severity while a separate Noul question addresses escalation. Keeping those questions separate gives the application distinct fields for risk level and review status.
+
+These examples describe the model contract, not a verified Vercel request body. Cloudflare invokes the model as `typesafe/jev` through Workers AI, while the supplied Vercel page does not expose a model identifier in its captured content. Do not assume that the Cloudflare identifier can be copied into Vercel unchanged.
+
+## Read results without overstating certainty
+
+The documented results are designed for machine-readable decisions. They still require application policy. A probability or confidence value describes the model's returned evaluation; it does not prove that an answer is correct or determine what the application must do.
+
+Cloudflare's sample response includes the evaluated model version, an answers object, and token usage. Within the answers object, the exact fields depend on the question type.
+
+| Result field | Appears with | Practical interpretation |
+| --- | --- | --- |
+| `noul` | Noul | Numeric signal for a true-or-false evaluation |
+| `choice` | Choice | Selected option key |
+| `score` | Score | Position on the ordered criteria scale |
+| `confidence` | Choice and Score examples | Model confidence for the returned evaluation |
+| `probabilities` | Choice and Score examples | Distribution across available outcomes |
+| `legend` | Score | Mapping from numeric positions to criteria |
+| `usage` | Overall response | Input-token and output-token counts |
+
+The examples show that a score may be fractional even when criteria are supplied as discrete ordered levels. An application should therefore preserve the legend and probability distribution instead of assuming that the score will always be a whole-number array index.
+
+For Jev AI Vercel workflows, define how low-confidence and ambiguous results are handled before automating downstream actions. A reasonable integration design can route uncertain evaluations to review, log the model version with the decision, and retain the named criteria used for that request. These are implementation recommendations, not behaviors promised by either provider.
+
+Avoid translating sample values into universal thresholds. The source responses illustrate particular inputs and criteria; they are not benchmarks, accuracy guarantees, or recommended operating cutoffs.
+
+## Know the supported limits
+
+The largest limitation in the supplied Jev AI Vercel evidence is documentation depth. Vercel's page confirms the model listing, provider, displayed price, promotion date, and one SDK import, but it does not provide a complete integration example in the captured material.
+
+Pricing is another explicit limit. As of this draft's September 20, 2026 date, the listing says Jev is free and that promotional pricing ends September 25, 2026. The source does not state what will happen afterward. Check the live listing rather than preserving “free” as an unconditional claim in product copy or cost calculations.
+
+The 32,000-token context window comes from Cloudflare's model page. It should be cited as a Cloudflare deployment detail unless Vercel independently publishes the same limit. The same caution applies to request syntax, model identifiers, response wrappers, and usage reporting.
+
+Jev is designed for structured decisions and does not replace generative chat models for writing or open-ended text generation. Its documented strengths are evaluating supplied state against explicit Noul, Choice, and Score questions. Use a different model category when the primary requirement is drafting prose, sustaining an open-ended conversation, or generating unrestricted content.
+
+Before deploying a Jev AI Vercel integration, verify:
+
+- The model is available to the relevant Vercel team.
+- The current pricing has been reviewed after the promotion date.
+- The current AI SDK documentation confirms the full evaluation call.
+- The correct Vercel model identifier has been obtained.
+- Each question has explicit, non-overlapping criteria.
+- The application validates results according to question type.
+- Uncertain or consequential decisions have an appropriate review path.
+- Current model and legal information has been checked in the linked [TypeSafe model documentation](https://docs.typesafe.ai/models.md) and [TypeSafe legal terms](https://docs.typesafe.ai/legal.md).
+
+## FAQ
+
+### Is Jev available through Vercel?
+
+The supplied [Vercel AI Gateway listing](https://vercel.com/ai-gateway/models/jev) presents Jev as a TypeSafe AI model and provides actions for obtaining an API key and reading the documentation. It also checks availability for the current team, so access should be confirmed in the relevant Vercel account.
+
+### Is the Jev AI Vercel integration free?
+
+The listing labels the price as free but states that promotional pricing ends on September 25, 2026. It does not provide a post-promotion price in the supplied content. Treat the price as time-sensitive and consult the live model page before estimating costs.
+
+### What can Jev evaluate?
+
+According to Cloudflare's official model documentation, Jev evaluates one text or structured state against Noul, Choice, and Score questions. Documented examples cover urgency detection, support routing, refund-policy review, frustration scoring, account-risk scoring, and escalation assessment.
+
+### Can I use Cloudflare's Jev code directly with Vercel?
+
+Not on the evidence provided. Cloudflare documents its own Workers AI invocation and uses the identifier `typesafe/jev`, while Vercel's captured page shows only the `experimental_evaluate` import. Use the Cloudflare material to understand Jev's question and answer structures, then follow Vercel's current documentation for gateway-specific authentication, identifiers, and request syntax.

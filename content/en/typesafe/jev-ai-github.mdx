@@ -1,0 +1,177 @@
+export const metadata = {
+  "title": "Jev AI GitHub Guide: Gist, Official Docs, and Setup",
+  "description": "Use this Jev AI GitHub guide to distinguish the community project reference from official TypeSafe docs, inspect model details, and plan safe integration.",
+  "category": "typesafe",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What Is Available for Jev AI on GitHub?
+
+The supplied evidence does not identify an official Jev AI GitHub repository or an open-source Jev model; the GitHub result is a community-maintained Gist, while TypeSafe's own documentation is the authoritative source for the hosted model and API. Use this Jev AI GitHub guide to understand what that Gist can help with, which claims require confirmation in the official docs, and how to plan a Jev integration without assuming that source code or model weights are public.
+
+This distinction matters because a GitHub page can be documentation, an example, a client library, or a third-party interpretation. Its presence does not establish that Jev itself is open source.
+
+| Resource | What the supplied evidence establishes | How to use it |
+| --- | --- | --- |
+| [Community project reference on GitHub Gist](https://gist.github.com/pjburnhill/adf8d28efcad9df037bfdece178ef965) | A broad reference covering Jev concepts, architecture, primitives, patterns, and limitations | Use it as an orientation aid, then verify implementation details against TypeSafe |
+| [TypeSafe introduction](https://docs.typesafe.ai/introduction.md) | Official explanation of Jev, System One models, and the three question primitives | Use it for the core product model and design guidance |
+| [TypeSafe models page](https://docs.typesafe.ai/models.md) | Official model identifiers, pricing, limits, input constraints, aliases, and model-listing examples | Check it before selecting a model or estimating request constraints |
+
+The GitHub Gist calls itself a working project reference with a knowledge date of September 16, 2026. That makes it useful for navigation and conceptual summaries, but it should not be treated as an official release record or API contract.
+
+## Understand What Jev Does Before Looking for Code
+
+A useful Jev AI GitHub search starts with the correct technical category. Jev is TypeSafe's flagship System One model, designed to evaluate typed questions against supplied state and return structured decisions that application code can consume directly, according to the [official introduction](https://docs.typesafe.ai/introduction.md).
+
+Jev is therefore not presented as a generative chat model. It does not replace an LLM when the task requires writing an article, producing an explanation, generating code, or returning other open-ended text. Its intended role is narrower: making bounded semantic judgments.
+
+A Jev request combines two concepts:
+
+- **State:** The text, JSON object, array, message, record, policy, or other textual application data being evaluated.
+- **Questions:** Predefined judgments about that state, with answer forms determined by one of Jev's primitives.
+
+The official documentation defines three primitives:
+
+| Primitive | Decision being requested | Returned information |
+| --- | --- | --- |
+| `Choice` | Select one option from a supplied list | Winning choice, option probabilities, and confidence |
+| `Score` | Place the state on a defined rubric | Score, level probabilities, and confidence |
+| `Noul` | Estimate whether a statement is true | A value from 0 to 1 |
+
+For example, a support application might use `Choice` to select a department, `Score` to assess incident severity, and `Noul` to estimate whether a message requests cancellation. These are examples of suitable task shapes, not verified performance claims.
+
+The official docs say that different question types can be included in the same API call. They are evaluated independently against the same state and in parallel. Because one question's answer does not become another question's context, dependent decisions should be coordinated explicitly in application code.
+
+That architecture is central to evaluating any Jev AI GitHub example. A credible example should keep workflow control, deterministic rules, and side effects in code while using Jev for focused semantic judgments.
+
+## Evaluate a Jev AI GitHub Resource
+
+When you encounter a repository, Gist, or code sample through a Jev AI GitHub search, first determine what it actually represents. Do not infer ownership, support, or compatibility from its name.
+
+### Step 1: Establish provenance
+
+Look for a clear owner, README, license, release history, and links back to TypeSafe documentation. In the supplied sources, only the Gist is hosted on GitHub, and nothing in the evidence establishes it as an official TypeSafe repository.
+
+Treat labels carefully:
+
+| Label or signal | Reasonable conclusion | Conclusion to avoid |
+| --- | --- | --- |
+| Hosted on `gist.github.com` | The material is a GitHub Gist | The Jev model is open source |
+| Links to TypeSafe docs | Claims may be traceable to official material | TypeSafe endorses every interpretation |
+| Contains architecture guidance | It may help explain system design | It defines the current API contract |
+| Includes a knowledge date | The author indicates when the reference was assembled | Every detail remains current afterward |
+
+For current model IDs, limits, and pricing, consult the official model page rather than relying on a static GitHub reference.
+
+### Step 2: Separate concepts from changing parameters
+
+Concepts such as state, atomic questions, and the `Choice`, `Score`, and `Noul` primitives describe Jev's basic design. Model aliases, versions, rate limits, pricing, and context limits can change.
+
+The [official models page](https://docs.typesafe.ai/models.md) lists the following details as of the supplied September 20, 2026 retrieval:
+
+| Parameter | Documented value |
+| --- | --- |
+| Versioned model | `jev-1.13.0` |
+| Stable alias | `jev-latest` |
+| Preview alias | `jev-preview`, then pointing to `jev-1.13.0` |
+| Endpoint shared by listed models | `POST /v1/systemone` |
+| Input | Text only, supplied as a string, JSON object, or array of text values |
+| Context | 64,000 tokens per request; 32,000 for state plus the longest question |
+| Listed rate limits | 250,000 tokens per second and 1,200 requests per minute |
+| Listed price | $42 per billion input tokens, or $0.042 per million input tokens |
+
+TypeSafe warns that rate limits are adjusting dynamically. These values should therefore be rechecked before publication or implementation. Output tokens are documented as free, but requests are charged by input tokens.
+
+### Step 3: Check examples against official SDK evidence
+
+The supplied official material includes one concrete cURL example: listing available models.
+
+```bash
+curl https://api.typesafe.ai/v1/models \
+  -H "Authorization: Bearer $TYPESAFE_API_KEY"
+```
+
+It also documents `TypeSafeClient` in Python and JavaScript examples for listing models. However, the supplied sources do not include the complete request schema for submitting System One questions. A Jev AI GitHub article should not invent that payload from conceptual descriptions.
+
+The safe next step is to follow the API-reference link exposed by the official documentation and confirm the current request shape before writing integration code.
+
+## Plan a Typesafe Jev Workflow
+
+Even without a verified official Jev AI GitHub repository, the supplied documentation supports a practical design process.
+
+### 1. Identify a bounded judgment
+
+Choose a task whose answer space can be defined before execution. Strong candidates include classification, detection, routing, semantic scoring, relevance assessment, and policy verification.
+
+Avoid using Jev when the required result is an essay, explanation, generated program, strategic plan, or other open-ended artifact. Jev is designed for structured decisions and does not replace generative chat models for writing or open-ended text generation.
+
+### 2. Build explicit state
+
+Include the information a knowledgeable reviewer would need to make the judgment. For nontrivial cases, structured state can make relationships among records, policies, messages, and prior events clearer.
+
+The model page says Jev accepts text only. Images, audio, video, and binary files must be converted into text or structured textual fields before being supplied as state.
+
+### 3. Decompose broad decisions
+
+The [TypeSafe introduction](https://docs.typesafe.ai/introduction.md) recommends atomic questions: judgments a knowledgeable person could make quickly from the available context. A broad request such as “rate this startup” should be divided into narrower dimensions such as market size, feasibility, and differentiation.
+
+Combine those results with explicit application logic. This keeps weights and business priorities visible in code.
+
+### 4. Choose the correct primitive
+
+Use `Noul` for a proposition, `Choice` for mutually defined alternatives, and `Score` for an ordered rubric. A score rubric should describe what each level means; labels such as “low,” “medium,” and “high” provide less guidance than operational definitions.
+
+### 5. Define uncertainty handling
+
+Probabilities are not guarantees. For `Choice` and `Score`, the docs describe probability distributions and a separate confidence value. For `Noul`, the 0-to-1 output itself represents uncertainty.
+
+A conceptual workflow might be:
+
+```text
+if confidence is above a validated automation threshold:
+    follow the selected application route
+else:
+    send the case to review or another appropriate process
+```
+
+This is conceptual pseudocode, not an official SDK example. Thresholds must be evaluated using domain-specific data, especially where an incorrect decision could cause harm.
+
+### 6. Pin versions when behavior must remain stable
+
+The official model page explains that aliases can move when releases change. It recommends pinning a versioned model ID when confidence thresholds have been tuned for that version. Applications should also log the versioned model reported in the response.
+
+## Known Limits and Responsible Interpretation
+
+The community [Jev project reference](https://gist.github.com/pjburnhill/adf8d28efcad9df037bfdece178ef965) emphasizes an important distinction: constrained output can prevent unexpected or malformed values without guaranteeing that the selected value is semantically correct.
+
+In practical terms, Jev may be restricted to returning one of your supplied categories, but it can still choose the wrong category. “No schema hallucination” should not be interpreted as “no judgment errors.”
+
+Other documented limits include:
+
+- Jev 1.13 accepts textual input, not native image, audio, video, or binary input.
+- English is its primary training language and is documented as the language where accuracy is currently best.
+- Other languages are supported unevenly and require testing on representative content.
+- The same model weights serve accounts; customization comes from state, instructions, criteria, and question design rather than customer-specific fine-tuning or LoRA adapters.
+- Jev questions within one request are independent, so dependent reasoning requires multiple application-controlled stages.
+- Confidence can guide routing, but it does not prove that an individual answer is correct.
+
+These limits should be visible in reviews of Jev AI GitHub examples. A sample that automatically performs a high-impact action without validation, uncertainty handling, or a review path demonstrates an incomplete production design.
+
+## Jev AI GitHub FAQ
+
+### Is there an official Jev AI GitHub repository?
+
+The supplied sources do not establish one. They provide a community GitHub Gist plus official TypeSafe documentation for the hosted Jev model. Do not describe the Gist as TypeSafe's official source repository.
+
+### Is Jev open source?
+
+The evidence does not say that Jev's model weights or implementation are open source. A GitHub-hosted reference document is not evidence of an open-source release.
+
+### Can I use GitHub examples instead of the TypeSafe documentation?
+
+Use them as secondary learning material. Confirm API schemas, model names, pricing, rate limits, and context constraints against the [official model documentation](https://docs.typesafe.ai/models.md), because operational details can change.
+
+### What should a trustworthy Jev AI GitHub example demonstrate?
+
+It should use bounded questions, select the appropriate primitive, keep control flow in application code, account for uncertainty, and avoid claiming that constrained outputs eliminate semantic errors. It should also identify whether model aliases are used or a specific version is pinned.

@@ -1,0 +1,210 @@
+export const metadata = {
+  "title": "Jev AI NodeJS Tutorial: Structured Decisions Guide",
+  "description": "Build a jev ai nodejs integration with Cloudflare Workers AI, typed Noul, Choice, and Score questions, response handling, thresholds, plus safeguards.",
+  "category": "integrations",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## Build a Jev AI NodeJS integration
+
+A **jev ai nodejs** integration lets a JavaScript or TypeScript application evaluate one state against structured questions and receive probabilities, choices, or scores instead of generated prose. The most directly documented **jev ai nodejs** path is Cloudflare Workers AI, where a Worker calls `env.AI.run()` with the `typesafe/jev` model. This tutorial covers that supported route, the three question types, response handling, and practical decision policies.
+
+Jev is TypeSafe AI's structured evaluation model. It is designed for fast, typed decisions rather than open-ended text generation, so it complements a generative model instead of replacing one used for writing, conversation, or broad reasoning. See the [Cloudflare Jev model documentation](https://developers.cloudflare.com/ai/models/typesafe/jev/index.md) and [LangChain's explanation of Jev](https://www.langchain.com/blog/building-a-harness-with-jev).
+
+| Capability | Jev behavior | Application use |
+|---|---|---|
+| Noul | Returns the probability that a statement is true | Urgency detection or escalation checks |
+| Choice | Selects among named options and returns probabilities plus confidence | Department or model routing |
+| Score | Evaluates ordered levels and returns a continuous score, distribution, and confidence | Risk, sentiment, or severity assessment |
+| Text generation | Not supported as Jev's primary function | Use a generative model instead |
+
+Cloudflare lists a 32,000-token context window for `typesafe/jev`. That is a platform-documented model limit, not a recommendation to send the maximum amount of context on every request.
+
+## Understand the request structure
+
+Every documented Jev request contains two required concepts:
+
+- `state`: the information to evaluate.
+- `questions`: a keyed object containing one or more typed evaluations.
+
+The state may be a string or structured data. The Cloudflare examples use both forms, including a plain support message and an object containing a ticket, order records, and refund policy. The LangChain source also says state can contain text, structured data, or messages.
+
+A single request can ask several questions about the same state. According to the LangChain article, Jev evaluates those questions in parallel. That makes a jev ai nodejs workflow useful when one incoming event needs several related labels, such as urgency, ownership, and frustration.
+
+| Field | Required | Supported source-backed form | Purpose |
+|---|---:|---|---|
+| `state` | Yes | Text or structured data | Supplies the facts Jev evaluates |
+| `questions` | Yes | Object keyed by application-defined names | Defines the requested evaluations |
+| `type` | Per question | `noul`, `choice`, or `score` | Selects the answer format |
+| `instructions` | Per documented example | Natural-language evaluation instruction | States what should be decided |
+| `criteria` | Used in documented examples | Boolean labels, named choices, or ordered levels | Clarifies the decision boundaries |
+
+### Choose the right question type
+
+Use `noul` when the application needs a probability for a yes-or-no proposition. An urgency check, for example, can ask whether a message conveys immediate time pressure. The result is not a JavaScript Boolean; it is a probability such as `0.95`, leaving the application responsible for deciding what that value should trigger.
+
+Use `choice` for mutually named destinations or categories. Each criterion is an object key with a description. The documented support-routing example offers `account`, `billing`, `technical`, and `other`, then returns the selected choice, an overall confidence value, and a probability for each option.
+
+Use `score` when labels have an order. Criteria are supplied as an array from one level to the next. The documented account-risk example uses low, moderate, and high risk, with results containing a continuous score, confidence, a numeric legend, and the distribution across levels.
+
+## Call Jev from a Cloudflare Worker
+
+The supported JavaScript-style example runs Jev through a Cloudflare Workers AI binding. Your Worker environment must expose that binding as `env.AI`. The supplied sources do not document a standalone TypeSafe Node.js npm package, so this tutorial does not assume one.
+
+The following call follows the request shape in the [official Cloudflare usage example](https://developers.cloudflare.com/ai/models/typesafe/jev/index.md):
+
+```ts
+const response = await env.AI.run(
+  "typesafe/jev",
+  {
+    state: "Help! My payouts have been failing for 3 days.",
+    questions: {
+      is_urgent: {
+        type: "noul",
+        instructions: "Does this convey urgency?",
+        criteria: {
+          true: "Explicitly time-sensitive",
+          false: "No urgency expressed",
+        },
+      },
+      department: {
+        type: "choice",
+        instructions: "Which team should handle this?",
+        criteria: {
+          billing: "Payments, invoicing, refunds",
+          technical: "Bugs, outages, integrations",
+          sales: "Pricing, upgrades, new accounts",
+        },
+      },
+      frustration: {
+        type: "score",
+        instructions: "How frustrated is the customer?",
+        criteria: ["Calm", "Frustrated", "Very angry"],
+      },
+    },
+  },
+);
+
+console.log(response);
+```
+
+This request demonstrates an important design pattern: provide the state once, then group related evaluations beneath `questions`. Meaningful question keys such as `is_urgent` and `department` also make the returned `answers` object easier to consume.
+
+Cloudflare documents a response with this overall shape:
+
+```json
+{
+  "model": "jev-1.13.0",
+  "answers": {
+    "is_urgent": {
+      "type": "noul",
+      "noul": 0.95
+    },
+    "department": {
+      "type": "choice",
+      "choice": "billing",
+      "confidence": 0.8,
+      "probabilities": {
+        "billing": 0.87,
+        "sales": 0,
+        "technical": 0.13
+      }
+    },
+    "frustration": {
+      "type": "score",
+      "score": 1.04,
+      "confidence": 0.94,
+      "legend": {
+        "0": "Calm",
+        "1": "Frustrated",
+        "2": "Very angry"
+      },
+      "probabilities": {
+        "0": 0,
+        "1": 0.96,
+        "2": 0.04
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 426,
+    "output_tokens": 73
+  }
+}
+```
+
+The numeric values above are Cloudflare's example output, not guaranteed results for every equivalent request. Model behavior and the reported model version may change.
+
+| Answer type | Primary result | Additional documented data |
+|---|---|---|
+| Noul | `noul` probability | Type identifier |
+| Choice | `choice` label | Confidence and per-choice probabilities |
+| Score | Continuous `score` | Confidence, legend, and level probabilities |
+| Response envelope | `answers` object | Model identifier and token usage |
+
+A conventional Node.js server can also call Cloudflare's HTTP endpoint, but the supplied documentation provides that route as a `curl` example rather than a JavaScript SDK method. Avoid inventing package names or client methods. If the Worker binding is unavailable in your architecture, implement the documented REST request with your platform's standard HTTP client and preserve the same `model` and `input` structure.
+
+## Turn probabilities into application decisions
+
+Jev returns evidence for a decision; it does not define your application's policy. A jev ai nodejs implementation therefore needs a separate layer that maps probabilities, confidence, and business rules to actions.
+
+For example, an application might examine urgency before changing queue priority. However, no universal urgency threshold appears in the supplied documentation. Thresholds should be selected through evaluation against representative application data, then reviewed whenever instructions, criteria, model versions, or input formats change.
+
+Keep these concerns separate:
+
+1. Jev evaluates the supplied state.
+2. Your code validates the response shape.
+3. Your policy decides whether to route, defer, or request review.
+4. The application records enough context to audit that decision.
+
+Do not interpret `choice` confidence as certainty. The full probability distribution can reveal ambiguity that the winning label alone hides. A result split between two departments may deserve a fallback route, even when one option technically ranks first.
+
+The same caution applies to scores. In Cloudflare's documented risk example, the score is continuous while the legend maps integers to ordered labels. Code should not assume the returned score is itself a ready-made authorization decision.
+
+| Use case | Suggested Jev type | State needed | Important limit |
+|---|---|---|---|
+| Support ownership | Choice | Customer message or structured ticket | Ambiguous distributions need a fallback |
+| Urgency detection | Noul | Message and relevant context | The application must choose its threshold |
+| Refund-policy review | Noul | Request, order facts, and policy | Evaluation should not execute the refund |
+| Account-risk assessment | Score and Noul | Account facts and recent events | High-impact actions should not rely on a label alone |
+| Agent model routing | Choice | Current request | Jev chooses among criteria; it does not generate the answer |
+
+The refund and account-risk patterns are documented examples, not proof that a model decision alone is sufficient for financial, security, or compliance actions. Keep deterministic validation and human review where consequences warrant them.
+
+## Limits and implementation safeguards
+
+Jev is not a chat model. The LangChain source explicitly distinguishes it from traditional LLMs because it returns typed evaluations rather than generated text. For a jev ai nodejs application, use Jev to classify or score a known state, then use ordinary application logic or a generative model for the next appropriate step.
+
+TypeSafe reports performance of up to 200 times faster inference and 400 times lower cost than comparable LLMs on classification tasks, according to the LangChain article. Those are company-reported claims relayed by LangChain, not independently established production results in the supplied evidence. They should not be presented as guaranteed performance for a particular workload.
+
+Practical safeguards include:
+
+- Give each criterion a distinct, concrete meaning.
+- Include an `other` option when real inputs may not fit known categories.
+- Validate that expected answer keys and types are present.
+- Treat probabilities and confidence as model outputs, not guarantees.
+- Test with routine, ambiguous, and adversarially worded states.
+- Keep policy enforcement outside the model response.
+- Require additional review for consequential actions.
+- Monitor the returned model identifier when behavior must be reproducible.
+
+The supplied sources do not state Cloudflare pricing amounts, rate limits, retry rules, service-level guarantees, or a TypeSafe Node.js SDK interface. Consult the linked [Cloudflare model page](https://developers.cloudflare.com/ai/models/typesafe/jev/index.md) and its dashboard for current platform details rather than hard-coding assumptions from this guide.
+
+## FAQ
+
+### Is there an official jev ai nodejs npm package?
+
+The supplied sources do not document one. They support a JavaScript or TypeScript call through Cloudflare Workers AI using `env.AI.run()`, plus an HTTP example using `curl`. A Node.js service can use the documented HTTP interface, but this article does not claim an official npm client.
+
+### Can Jev generate customer replies?
+
+No. Jev is designed for structured evaluation, including Noul, Choice, and Score answers. Use a generative chat model when the task requires writing a response or producing open-ended text.
+
+### Can one request contain multiple questions?
+
+Yes. The documented Cloudflare example asks for urgency, department, and frustration in one request. LangChain also states that questions against the same state are evaluated in parallel.
+
+### Should an application act on the highest probability automatically?
+
+Not by default. Jev supplies probabilities and, for Choice and Score, confidence information. Your application must define thresholds, fallbacks, validation, and review requirements appropriate to the consequences of the action.

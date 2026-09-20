@@ -1,0 +1,218 @@
+export const metadata = {
+  "title": "Jev AI Full Tutorial: Build Typed Decisions in Python",
+  "description": "This Jev AI full tutorial shows how to classify state in Python with Choice, Score, and Noul, combine typed results, and avoid documented model limits.",
+  "category": "guide",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## Jev AI Full Tutorial: What You Will Build
+
+This Jev AI full tutorial explains how to send application state to Jev, ask typed questions, and use the returned values in Python. Jev is designed for structured decisions, so it complements rather than replaces generative models used for writing and open-ended reasoning. By the end of this Jev AI full tutorial, you will have a source-backed pattern for classifying a support request with Choice, Score, and Noul in one call.
+
+Jev is TypeSafe's flagship System One model. It evaluates focused questions against supplied state and returns structured answers instead of generated prose, according to the [TypeSafe introduction](https://docs.typesafe.ai/introduction.md).
+
+This tutorial builds a ticket-triage example:
+
+| Component | Role in the example |
+| --- | --- |
+| State | Contains the customer's message and refund policy |
+| Choice | Selects the request's main category |
+| Score | Measures frustration on defined ordered levels |
+| Noul | Returns the probability that a statement is true |
+| Python logic | Decides how the application uses those answers |
+
+The example is intentionally limited to classification. Drafting a customer reply would require a generative model because Jev is not trained for text generation.
+
+## How Jev Makes Structured Decisions
+
+A Jev request has two central parts: a state and one or more questions. The state is the evidence being evaluated. It can be text or structured data, while each question defines one narrow judgment about that evidence.
+
+The [official primitives documentation](https://docs.typesafe.ai/primitives.md) defines three question types:
+
+| Primitive | Best fit | Returned information |
+| --- | --- | --- |
+| Choice | Selecting one option from a fixed, unordered set | Selected choice, option probabilities, and confidence |
+| Score | Positioning an input on an ordered rubric | Score, level legend, probabilities, and confidence |
+| Noul | Evaluating a specific yes-or-no statement | A value from 0 to 1 representing the probability of yes |
+
+A Noul value near 1 supports the statement, a value near 0 weighs against it, and a value near 0.5 indicates uncertainty. Noul does not include a separate confidence field. Choice and Score include confidence derived from their probability distributions.
+
+Questions submitted in the same request see the same state but are evaluated independently. One answer does not become hidden context for another. TypeSafe recommends sending questions that share a state together because they are evaluated in parallel and adding questions has little effect on response time beyond their additional tokens.
+
+That behavior shapes the main Jev AI full tutorial rule: ask one precise judgment per question, and combine the answers explicitly in code.
+
+For example, “What should we do with this customer?” bundles classification, policy interpretation, urgency, and workflow selection. A better design asks separately whether a refund was requested, which request category applies, and how frustrated the customer appears.
+
+## Build a Jev Classifier in Python
+
+The official Python examples import `TypeSafeClient`, `Choice`, `Score`, and `Noul` from `typesafe_sdk`. Before running this Jev AI full tutorial example, install and configure the official client according to TypeSafe's SDK documentation and make the credentials expected by that client available in your environment.
+
+### 1. Define a focused state
+
+Structured state makes the relevant evidence easy to identify:
+
+```python
+state = {
+    "ticket_message": (
+        "My flight was canceled, and I still have not received "
+        "instructions. Can I get a refund?"
+    ),
+    "refund_policy": (
+        "Canceled flights are eligible for a full refund."
+    ),
+}
+```
+
+Avoid filling the state with unrelated account history, logs, or previous conversations. TypeSafe's documented guidance says irrelevant detail can distract `jev-1.13` and reduce accuracy.
+
+### 2. Create typed questions
+
+Use Choice for a fixed category, Score for an ordered spectrum, and Noul for a binary judgment:
+
+```python
+from typesafe_sdk import Choice, Noul, Score, TypeSafeClient
+
+questions = {
+    "refund_requested": Noul(
+        instructions="Does `ticket_message` request a refund?",
+    ),
+    "request_type": Choice(
+        instructions="What is the main request in `ticket_message`?",
+        criteria={
+            "refund": "The customer wants money returned.",
+            "rebooking": "The customer wants a replacement flight.",
+            "information": "The customer is requesting information only.",
+        },
+    ),
+    "frustration": Score(
+        instructions=(
+            "How frustrated does the customer appear "
+            "in `ticket_message`?"
+        ),
+        criteria=[
+            "Calm and neutral.",
+            "Concerned but civil.",
+            "Very angry or using strong language.",
+        ],
+    ),
+}
+```
+
+The backticked paths in the instructions identify the state field each question should consider. Question IDs such as `request_type` are for your application; the complete judgment still belongs in `instructions`.
+
+Include an `other` or `none` option when a Choice list may not cover every input. Otherwise, the model must return one of the supplied choices even when none is a natural fit.
+
+### 3. Send one request
+
+The documented SDK pattern uses `client.system_one`:
+
+```python
+with TypeSafeClient() as client:
+    response = client.system_one(
+        state=state,
+        questions=questions,
+    )
+```
+
+All three questions are evaluated against the same state. This is preferable to making separate calls when no question depends on an earlier answer.
+
+### 4. Read the typed answers
+
+The response exposes answers under their question IDs:
+
+```python
+refund_probability = response.answers["refund_requested"].noul
+
+request_answer = response.answers["request_type"]
+request_type = request_answer.choice
+request_confidence = request_answer.confidence
+
+frustration_answer = response.answers["frustration"]
+frustration_score = frustration_answer.score
+frustration_confidence = frustration_answer.confidence
+```
+
+The Choice probabilities can show how strongly the selected category outranked alternatives. A Score can fall between defined levels, so treat it as a position on your rubric rather than as an exact real-world quantity.
+
+### 5. Apply application policy
+
+Jev supplies judgments and probabilities; your code owns the action policy. The following is illustrative application logic, not an official threshold recommendation:
+
+```python
+AUTO_REVIEW_THRESHOLD = 0.80
+
+if (
+    request_type == "refund"
+    and refund_probability >= AUTO_REVIEW_THRESHOLD
+):
+    next_queue = "refund_review"
+else:
+    next_queue = "manual_triage"
+```
+
+Thresholds should be selected and evaluated for the specific workflow. Do not assume a threshold tuned for Noul can be transferred to Choice confidence because the outputs represent different quantities.
+
+## Design Better Jev Questions
+
+The most important lesson in this Jev AI full tutorial is that question design should match the decision your software actually needs. The model performs focused semantic judgments; deterministic operations remain the responsibility of ordinary code.
+
+| Avoid | Use instead |
+| --- | --- |
+| “Analyze this ticket and choose the best action” | Ask separate questions about category, urgency, and policy relevance |
+| “Is the customer highly frustrated?” without a definition | Use Score with explicit levels |
+| Counting words, errors, or list items | Count with Python, a parser, or a regular expression |
+| Comparing dates written in different formats | Extract bounded components, then compare real dates in code |
+| Asking for an unspecified category | Use Choice with complete options and an `other` option |
+| Supplying an entire record by default | Send only fields relevant to the judgment |
+
+When several factors determine one business result, ask about each factor separately. For example, ticket priority could combine severity, customer frustration, and report quality. Your code can normalize and weight those scores, making the policy visible and adjustable without rewriting a broad prompt.
+
+Ask speculative questions in the same request when they use the same state. If severity matters only for bug reports, it can still be evaluated alongside the ticket category; code can ignore it for billing requests.
+
+Use a second request only when a real dependency exists. A follow-up may be justified when the first answer determines which records to retrieve or which options can be offered next. Questions that can all inspect the original state should normally remain together.
+
+## Limits and Deployment Checks
+
+The official [Jev 1.13 jaggedness page](https://docs.typesafe.ai/model-jaggedness/jev-1.13.md) documents several boundaries. These cautions apply specifically to `jev-1.13` and were last reviewed by TypeSafe on September 17, 2026.
+
+| Documented limitation | Practical response |
+| --- | --- |
+| Literal interpretation | State exact conditions and boundary cases |
+| Unreliable arithmetic and counting | Calculate deterministically in code |
+| Weak date and time comparison | Extract components, then compare in code |
+| Difficulty with multiple reasoning hops | Reduce indirection and identify relevant fields |
+| Accuracy loss from irrelevant state | Filter the state before sending it |
+| Sensitivity to adversarial content | Use precise criteria and test hostile inputs |
+| No text-generation training | Use a generative model when prose is required |
+
+Jev may also produce results that do not satisfy intuitive arithmetic relationships. The probability for “refund requested” is not guaranteed to equal one minus the probability for a separately worded negation. Likewise, a yes-or-no Choice and a Noul asking a similar question should not be treated as interchangeable.
+
+Before deploying the workflow from this Jev AI full tutorial:
+
+- Test representative, ambiguous, missing-data, and adversarial examples.
+- Review full probability distributions, not only selected labels.
+- Establish a manual-review path for uncertain or consequential cases.
+- Keep calculations, date comparisons, and structural rules in code.
+- Verify that instructions and criteria describe the same judgment.
+- Reevaluate thresholds when changing the primitive, rubric, or model version.
+
+TypeSafe reports that Jev can be used for routing and pre-execution tool checks, and the supplied [LangChain guide](https://www.langchain.com/blog/building-a-harness-with-jev) demonstrates related middleware patterns. Those examples do not eliminate the need to test the model against the risks and data of a specific application.
+
+## Jev AI Full Tutorial FAQ
+
+### Is Jev a chatbot or general-purpose text generator?
+
+No. Jev evaluates state and returns typed decisions and probabilities. It is designed for structured classification and judgment, while generative chat models remain appropriate for explanations, drafting, and open-ended text.
+
+### Can one request contain all three primitive types?
+
+Yes. Choice, Score, and Noul questions can be mixed in one request when they evaluate the same state. They are processed independently, and each answer is returned under its question ID.
+
+### Should Jev perform calculations or compare dates?
+
+No. The documented guidance for `jev-1.13` recommends keeping arithmetic, counting, and date comparison in code. Jev can handle the semantic judgment or bounded extraction step, while deterministic software performs exact operations.
+
+### What is the main takeaway from this Jev AI full tutorial?
+
+Use Jev for small, clearly defined decisions with bounded answer shapes. Supply only relevant state, ask atomic questions in parallel, inspect probabilities, and let explicit application code control thresholds, calculations, routing, and escalation.

@@ -1,0 +1,9 @@
+.env
+.tmp/
+output/
+digest/
+cache/
+transcripts/
+*.log
+__pycache__/
+*.pyc

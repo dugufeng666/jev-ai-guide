@@ -1,0 +1,176 @@
+export const metadata = {
+  "title": "Jev AI Docs: Build Typed Decisions With the TypeSafe API",
+  "description": "Use this independent Jev AI docs tutorial to send typed Choice, Score, and Noul questions, interpret probabilities, and design reliable API workflows.",
+  "category": "api",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What the Jev AI docs cover
+
+The Jev AI docs describe how to evaluate a shared state with typed questions and receive probabilities your application can use directly. This independent Jev AI docs tutorial explains the request model, Python workflow, response fields, deployment options, and operational limits. Jev is designed for structured decisions, not writing, conversation, or other open-ended text generation.
+
+TypeSafe calls Jev a System One model. Instead of generating prose, it makes focused judgments about supplied text or structured data. The model evaluates a `state` against one or more questions, returning an answer under each question ID.
+
+This design can reduce the need to ask a generative model for every classification or routing decision. TypeSafe reports that questions sharing the same state are evaluated independently and in parallel, so related judgments should usually be grouped into one request. See the official [TypeSafe primitives documentation](https://docs.typesafe.ai/primitives.md) for the complete model.
+
+| Primitive | Best fit | Main response fields |
+|---|---|---|
+| `Choice` | Selecting one option from an unordered set | `choice`, `probabilities`, `confidence` |
+| `Score` | Measuring a position across ordered levels | `score`, `legend`, `probabilities`, `confidence` |
+| `Noul` | Estimating whether a yes-or-no statement is true | `noul` |
+
+A `Choice` question can route a ticket to billing, technical support, sales, or another defined destination. A `Score` question can measure severity across levels such as low, moderate, and high. A `Noul` question returns the probability that a statement is true, with values near 1 indicating yes, values near 0 indicating no, and values near 0.5 indicating uncertainty.
+
+Noul does not have a separate confidence field. Its probability is the signal your code evaluates. By contrast, Choice and Score responses include both a distribution and a confidence value.
+
+## Build your first typed request
+
+A Jev request has three central parts: the model, the state, and the questions. The model is selected by the client or request, the state contains the evidence to evaluate, and each question defines one focused judgment.
+
+The official Jev AI docs support text, JSON objects, and arrays of text values as state. Jev does not accept images, audio, video, or binary data directly; those inputs must first be converted into text or structured fields. English is the primary training language, and TypeSafe advises testing accuracy carefully before relying on other languages.
+
+| Request element | Purpose | Practical guidance |
+|---|---|---|
+| `state` | Supplies the content and evidence | Include only relevant text or structured fields |
+| Question ID | Identifies an answer in your code | Use stable names such as `refund_requested` |
+| `type` | Selects the answer shape | Use `choice`, `score`, or `noul` |
+| `instructions` | Defines the judgment | Write a complete, specific question |
+| `criteria` | Defines options, levels, or boundaries | Make categories distinct and operational |
+
+Question IDs organize the response but are not sent to the model, according to TypeSafe. Therefore, `instructions` must state the complete question even when an ID such as `is_urgent` appears self-explanatory.
+
+The following Python structure is supported by the official SDK examples:
+
+```python
+from typesafe_sdk import Choice, Noul, Score, TypeSafeClient
+
+state = {
+    "ticket_message": (
+        "Our payment integration is returning errors, "
+        "and customers cannot complete purchases."
+    ),
+    "service_status": "Payment API errors began 20 minutes ago.",
+}
+
+with TypeSafeClient() as client:
+    response = client.system_one(
+        state=state,
+        questions={
+            "department": Choice(
+                instructions=(
+                    "Which team should handle the issue in `ticket_message`?"
+                ),
+                criteria={
+                    "billing": "Charges, invoices, or refunds.",
+                    "technical": "Bugs, outages, or integrations.",
+                    "sales": "Pricing, upgrades, or new accounts.",
+                },
+            ),
+            "urgent": Noul(
+                instructions=(
+                    "Does `ticket_message` describe an issue "
+                    "requiring immediate attention?"
+                ),
+            ),
+            "severity": Score(
+                instructions=(
+                    "How severe is the issue described by "
+                    "`ticket_message` and `service_status`?"
+                ),
+                criteria=[
+                    "Low: little or no user impact.",
+                    "Moderate: some users or functions are affected.",
+                    "High: a critical customer workflow is unavailable.",
+                ],
+            ),
+        },
+    )
+
+print(response.answers["department"].choice)
+print(response.answers["urgent"].noul)
+print(response.answers["severity"].score)
+```
+
+This example uses the documented `TypeSafeClient.system_one` method and typed `Choice`, `Noul`, and `Score` classes. It also follows the documentation’s recommendation to identify fields with paths in backticks when a structured state contains several possible sources of evidence.
+
+Credentials should be kept outside application source code. TypeSafe’s LangChain example uses the `TYPESAFE_API_KEY` environment variable, while the exact setup requirements for the direct SDK should be checked against the current [TypeSafe model documentation](https://docs.typesafe.ai/models.md).
+
+## Interpret answers and compose decisions
+
+Jev responses are intended to feed application logic rather than be displayed as generated prose. A Choice result identifies the selected option and provides the probability assigned to every option. A Score result supplies a continuous position along the defined levels, while its legend connects numeric positions to your criteria.
+
+The Jev AI docs make an important distinction between probability and measurement. A Noul result of `0.5` means the model assigns equal probability to yes and no; it does not represent a medium level of the underlying quality. To measure a spectrum such as customer frustration or technical skill, use Score with clearly defined levels.
+
+| Result | Correct interpretation | Common mistake |
+|---|---|---|
+| Noul near `1` | Strong probability that the statement is true | Treating it as an intensity score |
+| Noul near `0.5` | The yes-or-no judgment is uncertain | Calling it a medium rating |
+| Choice probability distribution | Relative support for each supplied option | Ignoring close alternatives |
+| Score between levels | A position along an ordered scale | Assuming only whole-number results |
+| Confidence | How concentrated a Choice or Score distribution is | Treating it as guaranteed correctness |
+
+Do not adopt an arbitrary probability threshold from a tutorial. Choose thresholds with representative data from your own workflow, decide what should happen near the boundary, and preserve an escalation path for uncertain or consequential cases.
+
+Following the Jev AI docs also means decomposing broad evaluations. Rather than asking the model to “analyze this ticket and decide what to do,” ask separately whether the customer requests a refund, which department owns the problem, and how severe the reported impact is. Combine those answers with transparent application rules.
+
+Questions in the same request are independent. One answer does not become hidden context for another. Use a second request only when the first answer is genuinely needed to fetch data, construct a new state, or determine the available options for the next question.
+
+## Use Jev in an application workflow
+
+Jev can support routing, triage, policy evaluation, and risk classification when the required output can be represented by the three typed primitives. It complements a generative model: Jev handles fast structured judgments, while a chat or language model handles explanation, drafting, and open-ended reasoning.
+
+| Use case | Suggested primitive | Application action |
+|---|---|---|
+| Route a support request | Choice | Select a queue or handler |
+| Detect an explicit refund request | Noul | Continue to policy checks |
+| Measure incident severity | Score | Apply a tested escalation rule |
+| Choose an agent model tier | Choice | Route the next generative request |
+| Review a proposed tool action | Noul or Choice | Allow, block, or request human review |
+
+The LangChain integration exposes Jev through `TypeSafeClassifier`. The cited LangChain guide also describes experimental model-routing and tool guardrail middleware. These integrations illustrate possible agent patterns, but they do not make agents inherently reliable or remove the need for authorization checks, evaluation, and human review. See LangChain’s [guide to building a harness with Jev](https://www.langchain.com/blog/building-a-harness-with-jev).
+
+Cloudflare Workers AI offers another documented route under the model name `typesafe/jev`. Its examples send `state` and `questions` through `env.AI.run` and return the same three answer families. The Cloudflare model page lists a 32,000-token context window for that hosted offering; consult the [Cloudflare Jev documentation](https://developers.cloudflare.com/ai/models/typesafe/jev/index.md) for its current interface and dashboard pricing.
+
+When several questions use the same state, send them together where practical. TypeSafe calls this speculative fan-out: the application requests potentially useful judgments in parallel and later ignores answers that do not apply. The benefit is specific to independent questions; dependent decisions still require separate requests.
+
+## Models, pricing, and documented limits
+
+As of this draft’s source collection date, TypeSafe lists `jev-1.13.0` as its current versioned model. The `jev-latest` alias points to the most recent stable official release, while `jev-preview` points to the newest release whether stable or preview. Both aliases currently resolve to `jev-1.13.0`, but aliases can move when TypeSafe publishes another model.
+
+Use an alias when automatically receiving new releases is acceptable. Pin a versioned ID when behavior must remain stable while thresholds and application rules are evaluated. The response reports the versioned model that handled the request, so log that field for traceability.
+
+| Official TypeSafe item | Documented value |
+|---|---|
+| Stable alias | `jev-latest` |
+| Version listed in supplied docs | `jev-1.13.0` |
+| Price | $0.042 per million input tokens |
+| Output-token charge | Free |
+| Published rate limit | 250,000 tokens per second and 1,200 requests per minute |
+| Request budget | 64,000 tokens across state and questions |
+| Additional context constraint | 32,000 tokens for state plus the longest question |
+| Input modalities | Text, JSON objects, or arrays of text values |
+
+These figures come from the official [TypeSafe models page](https://docs.typesafe.ai/models.md) and may change. TypeSafe specifically warns that rate limits are adjusting dynamically. A request exceeding either published limit returns HTTP `429`; the official client SDKs retry with backoff and honor `retry-after` when that header is present.
+
+The Jev AI docs also state that pricing applies to input tokens and that output tokens are free. Because the state is ingested once while questions are evaluated in parallel, grouping related questions can avoid repeatedly sending the same state.
+
+Jev is not customized with customer-specific fine-tuning or LoRA adapters. TypeSafe says the same model weights serve every account; domain adaptation happens through state, instructions, criteria, and application logic. TypeSafe also states that customer requests and responses are not used for model training, while zero-data-retention details are reserved for enterprise arrangements.
+
+## Jev AI Docs FAQ
+
+### Is Jev a replacement for a generative LLM?
+
+No. Jev returns typed decisions and probabilities instead of generated text. Use it for focused classification and scoring, while retaining a generative model for writing, conversation, explanation, or open-ended reasoning.
+
+### Which question type should I start with?
+
+Use Choice for one option from a defined set, Score for ordered levels, and Noul for a precise yes-or-no judgment. Choose the type whose result maps most directly to your application logic.
+
+### Can multiple questions share one state?
+
+Yes. The Jev AI docs recommend grouping independent questions that evaluate the same state. They are processed in parallel, but one question’s answer is not available to another question in that request.
+
+### What should be reviewed before production use?
+
+Evaluate representative inputs, define uncertainty and escalation behavior, validate thresholds, log the resolved model version, and monitor rate-limit responses. Also verify current model, pricing, privacy, and language-support details in the official documentation before deployment.

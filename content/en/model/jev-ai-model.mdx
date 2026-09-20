@@ -1,0 +1,161 @@
+export const metadata = {
+  "title": "Jev AI Model Tutorial: Building Fast Typed Decisions",
+  "description": "Learn how the Jev AI model turns text and structured state into typed decisions, how to use Choice, Score, and Noul, and where its limits matter most.",
+  "category": "model",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What Is the Jev AI Model?
+
+The **Jev AI model** is TypeSafe AI's first System One model, designed to turn text or structured program state into typed, probabilistic decisions that software can use directly. Instead of generating an open-ended response, the **Jev AI model** answers predefined Choice, Score, and Noul questions, making it suitable for classification, routing, scoring, verification, and other bounded decisions.
+
+Jev AI Guides is an independent tutorial resource and is not affiliated with or endorsed by TypeSafe AI. Jev remains an early-access technology, so review the official documentation and test behavior on your own data before using it in consequential workflows.
+
+## How Jev Differs From a Generative LLM
+
+Conventional large language models generate strings one token at a time. That is useful when the desired result is an explanation, email, code sample, or conversation, but software often needs a boolean-like probability, an enum, or a score rather than prose.
+
+The Jev AI model is built around a different interface: provide a state, define the permitted questions and answers, and receive structured values. TypeSafe describes this as a System One approach inspired by the distinction between fast, intuitive judgments and slower, deliberate reasoning. Its model architecture, parallel sampler, and training method are optimized for these bounded decisions, according to the [TypeSafe announcement](https://typesafe.ai/blog/introducing-system-one-models-and-jev).
+
+| Capability | Jev | Generative LLM |
+|---|---|---|
+| Primary output | Typed values and probability distributions | Generated text |
+| Answer space | Defined before the request | Open-ended |
+| Sampling approach | Questions evaluated in parallel | Tokens generated sequentially |
+| Best fit | Classification, routing, scoring, and checks | Writing, conversation, and extended reasoning |
+| Text parsing required | No for supported typed answers | Usually required when code needs structured data |
+| Open-ended writing | Not supported as its intended task | Core capability |
+
+This distinction is important: Jev does not replace a generative chat model for writing or open-ended text generation. A practical system can use ordinary code for exact computation, Jev for bounded judgment, and a generative model when the application must explain or compose something.
+
+TypeSafe says Jev's schema-constrained outputs cannot contain structural type errors because every answer must come from the predefined output space. That does not mean every decision is factually correct. It means the result has the expected shape, while probabilities and confidence help the application decide whether to act or request human review.
+
+## Understand the Three Jev Question Types
+
+The Jev AI model exposes three question primitives: Choice, Score, and Noul. Multiple question types can be included in one request, and each is evaluated independently against the same state, according to the [TypeSafe primitives documentation](https://docs.typesafe.ai/primitives.md).
+
+| Primitive | Use it when you need | Returned information |
+|---|---|---|
+| Choice | One option from a fixed, unordered list | Selected choice, probability for each option, and confidence |
+| Score | A position on a defined ordered scale | Score, level legend, probabilities, and confidence |
+| Noul | The probability that a statement is true | A value from 0 to 1 |
+
+"Noul" is the official primitive name; it is not `null`. A Noul result near 1 indicates stronger support for yes, a value near 0 supports no, and a value near 0.5 indicates uncertainty. Unlike Choice and Score, Noul does not return a separate confidence field.
+
+### Choice for Routing
+
+Use Choice when your code must select among known alternatives. A support workflow might define `billing`, `technical`, and `sales` as the only permitted destinations. If those options do not cover every possible state, the documentation recommends adding an `other` or `none of the above` option.
+
+Choice is relative: it asks which available option fits best. It should not be treated as identical to asking a separate Noul question about every option.
+
+### Score for Ordered Levels
+
+Use Score when the possible answers form a spectrum. For example, customer frustration could have levels such as calm, concerned, and very angry.
+
+Define what every level means instead of asking for an unexplained number. Jev may return a position between levels, but TypeSafe warns against treating that interpolation as a numerically precise measurement.
+
+### Noul for Yes-or-No Probability
+
+Use Noul when the probability itself can drive an `if` statement. Appropriate questions include whether a message requests a refund or whether a report describes a software defect.
+
+The condition must be explicit. "Is this candidate strong in Python?" is ambiguous unless "strong" is defined. Asking whether the resume states that the candidate used Python professionally gives the model a more concrete judgment.
+
+## Build a Jev Decision Workflow
+
+A reliable Jev AI model workflow begins by separating exact computation from subjective judgment. Dates, arithmetic, database lookups, and deterministic policy checks belong in code. Jev should handle focused questions that require semantic interpretation.
+
+### 1. Prepare Relevant State
+
+State is the information Jev evaluates. It can be a string, a JSON object, or an array of text values. For a support ticket, it might contain the customer's message, relevant account information, and the applicable policy.
+
+Send only the information needed for the decision. TypeSafe reports that irrelevant detail can reduce accuracy, so a larger state is not automatically better. Where possible, retrieve and filter records before calling the model.
+
+### 2. Decompose the Judgment
+
+Each question should ask for one focused determination. Instead of asking Jev to "analyze this ticket and decide what to do," split that request into atomic questions:
+
+- Which department should receive the ticket?
+- Does the customer explicitly request a refund?
+- How frustrated does the customer appear?
+- Does the message indicate an urgent service interruption?
+
+These can be evaluated together because they share the same state. TypeSafe says questions in one request are independent, so one answer does not become hidden context for another.
+
+### 3. Define Criteria Precisely
+
+For Choice and Score, spell out what every option or level means. For Noul, clarify ambiguous boundaries where necessary.
+
+When the state is structured, the official guidance recommends naming relevant fields in the instructions. A question can point specifically to a ticket message, policy field, or list of charges instead of leaving Jev to infer which data matters.
+
+### 4. Apply Thresholds in Code
+
+Do not let a model probability silently become a business action. Define application rules for automatic handling, rejection, and escalation.
+
+| Result pattern | Example application behavior |
+|---|---|
+| High confidence and low-risk action | Continue through an automated branch |
+| Ambiguous probability or confidence | Send to human review |
+| Missing or uncovered Choice option | Use an explicit fallback path |
+| Consequential or irreversible action | Require additional validation |
+| Model and deterministic rules disagree | Stop and investigate |
+
+The exact thresholds are application-specific and are not supplied by the model. Establish them using representative evaluation data, and retune them when changing model versions or question definitions.
+
+### 5. Pin and Log the Model Version
+
+The current model documented in the supplied sources is Jev 1.13, identified as `jev-1.13.0`. The aliases `jev-latest` and `jev-preview` pointed to that version when the documentation was retrieved.
+
+Aliases can move when TypeSafe releases a new version. The [official models documentation](https://docs.typesafe.ai/models.md) recommends pinning a version when thresholds have been tuned to its behavior and logging the versioned model ID returned with each response.
+
+## Capabilities, Pricing, and Limits
+
+According to TypeSafe's model page, Jev 1.13 accepts text but not images, audio, video, or binary input. Non-text sources must be converted into text or structured fields before they are submitted.
+
+| Parameter | Documented value for Jev 1.13 |
+|---|---|
+| Versioned model ID | `jev-1.13.0` |
+| Stable alias | `jev-latest` |
+| Input price | $42 per billion tokens, or $0.042 per million tokens |
+| Output-token price | Free |
+| Rate limits | 250,000 tokens per second and 1,200 requests per minute |
+| Request context | 64,000 tokens total |
+| State plus longest question | 32,000 tokens |
+| Supported input | Text in a string, JSON object, or array of text values |
+
+TypeSafe warns that rate limits may change while capacity is being adjusted. SDKs reportedly retry rate-limited requests with backoff, while direct HTTP integrations must handle `429 Too Many Requests` responses and the `retry-after` header.
+
+The company reports end-to-end response times from 70 to 500 milliseconds and workflow-evaluation gains as high as 193.6 times faster and 444.6 times cheaper than the models used in its comparisons. These are vendor-reported results, and TypeSafe says they are probably toward the upper end of real-world gains.
+
+The same [official benchmark discussion](https://typesafe.ai/blog/introducing-system-one-models-and-jev) notes that the workflows were created by members of TypeSafe's model-capabilities team and may contain bias. Treat the figures as evidence about the company's evaluations, not as a guarantee for every workload.
+
+The Jev AI model also has documented failure modes:
+
+- It can interpret instructions too literally.
+- It is unreliable for counting, arithmetic, and numeric precision.
+- It should not perform date ordering or duration calculations.
+- Accuracy can decline with excessive irrelevant context.
+- Multi-hop reasoning and indirect instructions can be difficult.
+- Adversarial text in the state may influence answers.
+- Contradictory instructions and criteria can cause confusion.
+- It is not intended to generate prose.
+
+TypeSafe's [Jev 1.13 limitations page](https://docs.typesafe.ai/model-jaggedness/jev-1.13.md) recommends keeping arithmetic and date comparison in code, reducing indirection, filtering state, and testing adversarial cases before broad deployment.
+
+## Frequently Asked Questions
+
+### What is the Jev AI model used for?
+
+The Jev AI model is used for bounded, structured judgments such as classifying records, routing requests, scoring qualitative traits, verifying conditions, and deciding which code path should run. It is most appropriate when the possible output shape can be defined in advance.
+
+### Can Jev write articles or chatbot responses?
+
+No. Jev is not designed for open-ended text generation. Use a generative language model when the required output is an article, explanation, conversational reply, or other original prose.
+
+### Does type safety mean Jev is always correct?
+
+No. Type safety means the response conforms to the predefined answer structure. Jev can still select the wrong option or assign an imperfect probability, which is why evaluation, confidence-based routing, deterministic checks, and human escalation remain important.
+
+### Is Jev ready for every production workflow?
+
+The supplied sources describe Jev as an early-access model with known limitations. Before production use, test it on representative and adversarial inputs, keep exact computation in code, define fallback behavior, log model versions, and avoid automatically executing consequential actions solely from an unvalidated model result.

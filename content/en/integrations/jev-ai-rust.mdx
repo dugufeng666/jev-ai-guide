@@ -1,0 +1,175 @@
+export const metadata = {
+  "title": "Jev AI Rust: Build Typed Decisions with Cloudflare",
+  "description": "Learn how a Jev AI Rust integration can call Cloudflare Workers AI, shape typed questions, parse probabilities, and apply confidence-aware routing rules.",
+  "category": "integrations",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## How a Jev AI Rust integration works
+
+A Jev AI Rust integration can send structured application state to Jev through Cloudflare Workers AI and receive typed decisions, probabilities, and confidence data as JSON. Because the available documentation provides JavaScript and cURL examples rather than a Rust SDK example, this Jev AI Rust tutorial focuses on the documented HTTP contract and the Rust-side responsibilities needed to use it accurately.
+
+Jev is TypeSafe's structured evaluation model. Instead of generating prose, it evaluates a supplied state against predefined `noul`, `choice`, and `score` questions. Cloudflare lists the hosted model as `typesafe/jev` with a 32,000-token context window in its [official Jev model documentation](https://developers.cloudflare.com/ai/models/typesafe/jev/index.md).
+
+This makes Jev relevant when a Rust service needs a bounded decision such as routing a support request, assessing a defined risk scale, or determining whether text satisfies a criterion. It is not a replacement for a generative chat model when the application needs an article, conversational response, code, or other open-ended text.
+
+## Understand Jev's typed decision model
+
+Every documented Jev request has two primary parts: `state` and `questions`. The state can be plain text or structured data. Each named question tells the model which result shape to return and supplies instructions, criteria, or both.
+
+| Question type | Intended result | Documented response data |
+|---|---|---|
+| `noul` | Evaluate a two-sided or Boolean-like criterion | A numeric `noul` value |
+| `choice` | Select one option from named criteria | Selected `choice`, `confidence`, and per-option `probabilities` |
+| `score` | Evaluate state against an ordered criteria list | Numeric `score`, `confidence`, `legend`, and per-level `probabilities` |
+
+The source describes these as type-safe structured values. TypeSafe says possible outputs are defined in advance and that Jev does not generate strings freely. Its broader explanation is available in the [TypeSafe introduction to Jev and System One Models](https://typesafe.ai/blog/introducing-system-one-models-and-jev).
+
+That distinction is important for a Jev AI Rust implementation. Rust's own type system can represent the expected response variants, but the remote model still makes probabilistic judgments. A valid response shape does not establish that every decision is correct.
+
+### Choose the appropriate question type
+
+Use `noul` when the application needs evidence for or against a stated condition. Cloudflare's refund example asks whether a message requests a refund and whether the supplied policy supports it.
+
+Use `choice` when the result must be one member of a closed set. The documented support example defines `account`, `billing`, `technical`, and `other`, then receives a selected department plus probabilities for every option.
+
+Use `score` when the options form an ordered scale. Cloudflare demonstrates this with low, moderate, and high account-risk criteria. Its sample response includes a continuous score of `1.84` as well as probabilities over levels `0`, `1`, and `2`.
+
+| Rust application need | Suitable Jev question | Why |
+|---|---|---|
+| Detect whether a requirement is met | `noul` | Returns a numeric assessment for the stated condition |
+| Route a record to one known destination | `choice` | Constrains the answer to predefined keys |
+| Place a record on an ordered scale | `score` | Preserves the criteria order and returns a score distribution |
+| Generate a customer-facing reply | None | Jev is designed for decisions, not open-ended writing |
+
+## Build the documented request
+
+Cloudflare documents the HTTP endpoint as:
+
+`https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/run`
+
+The request uses a bearer token in the `Authorization` header, declares `application/json`, identifies the model as `typesafe/jev`, and places the model payload under `input`. The following request shape comes directly from the documented support-routing example:
+
+```json
+{
+  "model": "typesafe/jev",
+  "input": {
+    "state": "I cannot log in after changing my password, and the reset email never arrives.",
+    "questions": {
+      "department": {
+        "type": "choice",
+        "instructions": "Which team should handle this support request?",
+        "criteria": {
+          "account": "Login, password, profile, or security issues",
+          "billing": "Charges, invoices, refunds, or subscriptions",
+          "technical": "Product bugs, outages, or integrations",
+          "other": "Requests that do not fit the other departments"
+        }
+      }
+    }
+  }
+}
+```
+
+A Rust client must serialize the same JSON structure and make an authenticated POST request. The supplied sources do not identify an official Rust SDK, crate, or Rust-specific method, so selecting an HTTP and serialization library is an application-level decision rather than part of the documented Jev API.
+
+A practical Jev AI Rust workflow has five stages:
+
+| Step | Rust-side responsibility | Documented Jev contract |
+|---|---|---|
+| 1 | Collect the relevant program state | `state` is required and may be text or structured data |
+| 2 | Define stable question keys | `questions` is a required object |
+| 3 | Serialize the request | Send `model` and `input` as JSON |
+| 4 | Make the authenticated request | POST to the documented Cloudflare account endpoint |
+| 5 | Decode and validate the result | Read `answers`, model information, and `usage` |
+
+Keep question keys stable because they become keys in the returned `answers` object. Define criteria precisely enough that two options do not unintentionally describe the same outcome. For a routing decision, each option should represent a destination the Rust application can actually handle.
+
+Structured state is useful when the decision depends on multiple facts. Cloudflare's refund example passes a ticket, an order identifier, captured charges, and a refund policy together. Its risk example includes account age, recent events, and verification status.
+
+## Parse probabilities and apply policy
+
+The response is not merely a selected label. In the documented department-routing result, Jev returns the model version, a typed answer, a chosen department, confidence, probabilities, and token usage.
+
+```json
+{
+  "model": "jev-1.13.0",
+  "answers": {
+    "department": {
+      "type": "choice",
+      "choice": "account",
+      "confidence": 1,
+      "probabilities": {
+        "technical": 0,
+        "billing": 0,
+        "account": 1,
+        "other": 0
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 380,
+    "output_tokens": 45
+  }
+}
+```
+
+Do not deserialize every answer into one undifferentiated structure. A Jev AI Rust client should distinguish the documented answer types so that code expecting a `choice` cannot silently treat a `score` as the same result.
+
+| Response field | How to use it |
+|---|---|
+| `model` | Record which returned model version produced the decision |
+| `answers` | Match results to the question keys sent in the request |
+| `type` | Select the correct decoding and handling path |
+| `choice` | Read the selected named option for a choice question |
+| `score` | Read the numeric result for an ordered score question |
+| `confidence` | Apply an application-defined review or fallback policy |
+| `probabilities` | Inspect uncertainty across available choices or levels |
+| `legend` | Map score indexes back to their documented criteria |
+| `usage` | Observe the reported input and output token counts |
+
+The sources do not prescribe a universal confidence threshold. A Rust service should therefore treat escalation rules as local policy, not as a hidden Jev parameter. For example, an organization may decide that uncertain support routing goes to a general queue, while security decisions require human review under stricter conditions.
+
+Avoid interpreting probability as authorization. A high probability can inform branching, but sensitive actions should still be constrained by ordinary validation, access control, business rules, and review requirements.
+
+When decoding results, reject unknown answer types unless the application has an explicit compatibility strategy. Also handle non-successful HTTP responses, malformed envelopes, missing question keys, and model changes. These are normal integration concerns even when the model's structured answer schema is constrained.
+
+## Know where the integration fits
+
+TypeSafe positions Jev as a fast, structured decision system for classification, routing, scoring, extraction, verification, and workflow branching. The company contrasts that design with language models that generate one token at a time and require generated text to be parsed.
+
+The TypeSafe blog reports response times between 70 and 500 milliseconds for its service and claims substantial speed and cost advantages in its workflow evaluations. Those are vendor-published results, not measurements from Jev AI Guides, and TypeSafe explicitly provides caveats.
+
+Its evaluation workflows were created by members of the company's model-capabilities team, so the company acknowledges possible bias. The reference answers were averages from large external models rather than ground-truth labels. TypeSafe also says the largest reported gains are likely near the high end of real-world improvements.
+
+| Known limitation or caveat | Integration consequence |
+|---|---|
+| Jev gives up free-form string generation | Use another system for prose or open-ended responses |
+| Decisions remain probabilistic | Define fallback and review behavior |
+| Published performance comes from vendor evaluations | Benchmark with your own representative workload |
+| Some evaluation design bias may exist | Do not treat reported comparisons as independent validation |
+| Cloudflare's supplied page has no Rust SDK example | Implement against the documented HTTP and JSON contract |
+| Early TypeSafe access was described as limited | Do not assume access through every possible TypeSafe channel |
+
+TypeSafe also says its published speed tests were generally run from laptops on the U.S. West Coast, where its service was based at the time described. Network location, Cloudflare deployment details, input size, and workload shape can affect an application's observed latency.
+
+For production evaluation, record response time, error rate, confidence distribution, fallback frequency, and agreement with reviewed outcomes. That evidence will be more useful to a particular Rust service than adopting a vendor-wide benchmark as an expected result.
+
+## Jev AI Rust FAQ
+
+### Is there an official Jev Rust SDK?
+
+The supplied official sources do not document a Rust SDK or Rust-specific client method. They document a Cloudflare Workers binding example in TypeScript and an authenticated HTTP example using cURL. A Rust integration can target that HTTP JSON contract, but library-specific Rust code would depend on choices not specified by the sources.
+
+### What data can a Rust application send as state?
+
+Cloudflare's examples show both plain text and structured objects. Structured examples include nested ticket, order, policy, account, and event data. The model page lists a 32,000-token context window, but the supplied source does not document Rust-specific payload limits beyond that model information.
+
+### Does Jev replace a generative language model?
+
+No. Jev is designed for typed, probabilistic decisions over predefined questions. It does not replace a chat or text-generation model when the required output is an explanation, message, article, code sample, or other open-ended string.
+
+### What is the safest way to start a Jev AI Rust integration?
+
+Begin with one bounded `choice`, `score`, or `noul` decision whose outcomes are already represented in the application. Preserve probabilities and confidence, define a fallback for uncertain or invalid results, and compare decisions with reviewed examples before allowing the output to control consequential workflow actions.

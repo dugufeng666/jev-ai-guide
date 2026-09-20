@@ -1,0 +1,209 @@
+export const metadata = {
+  "title": "Jev AI Classification Model: A Practical Setup Guide",
+  "description": "Learn how the jev ai classification model makes typed choices, scores, and yes/no judgments, with Python setup patterns, safeguards, costs, and limits.",
+  "category": "model",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What Is the Jev AI Classification Model?
+
+The **Jev AI classification model** is TypeSafe’s model for making fast, structured judgments that software can consume directly. Instead of generating prose, the **Jev AI classification model** evaluates a supplied state against typed questions and returns choices, scores, or probabilities that application code can use for routing, ranking, and conditional logic.
+
+TypeSafe calls Jev a “System One” model: a model optimized for focused decisions that can be made without extended reasoning. It is intended for tasks such as classifying support tickets, detecting whether a statement is true, and rating an input against defined levels. It does not replace a generative chat model for writing, summarization, or other open-ended text generation.
+
+According to the [TypeSafe introduction](https://docs.typesafe.ai/introduction.md), Jev receives two core inputs:
+
+- **State:** The text or structured data being evaluated.
+- **Questions:** One or more typed judgments to make about that state.
+
+The response contains typed values rather than prose that must be parsed. This makes Jev useful when the result needs to drive predictable code paths.
+
+## How Jev’s Three Question Types Work
+
+The Jev AI classification model exposes three question primitives: Choice, Score, and Noul. Questions sent in the same request share the same state, but TypeSafe says they are evaluated independently and in parallel.
+
+| Primitive | Best suited for | Returned value |
+| --- | --- | --- |
+| Choice | Selecting one item from a fixed set | Selected choice, option probabilities, and confidence |
+| Score | Rating an input across ordered levels | Score, level legend, probabilities, and confidence |
+| Noul | Estimating whether a statement is true | A probability from 0 to 1 |
+
+These response shapes are documented in the official [TypeSafe primitives reference](https://docs.typesafe.ai/primitives.md).
+
+### Choice for categorical classification
+
+Use Choice when your application must select one of several named options. Common examples include assigning a ticket to billing or technical support, identifying a document type, or choosing a workflow.
+
+Each option should include a meaningful description. When inputs may fall outside the known categories, add an `other`, `unknown`, or `none_of_the_above` option. Jev is constrained to the choices you provide, so omitting a valid fallback can force it to select an unsuitable category.
+
+### Score for ordered levels
+
+Use Score when the possible answers form a scale. For example, a support team might rate customer frustration as calm, concerned, or angry.
+
+The model can return a position between defined levels, but TypeSafe warns against interpreting that position as an exact real-world measurement. A frustration score can support a threshold or ranking operation; it should not be treated as a precise numerical quantity.
+
+### Noul for yes-or-no judgments
+
+Noul returns the estimated probability that a statement is true. A value near 1 favors yes, a value near 0 favors no, and a value around 0.5 represents uncertainty.
+
+Noul is appropriate for direct questions such as “Does the customer request a refund?” It is not a substitute for a graded Score. For example, a Noul value of 0.5 does not mean someone has an intermediate skill level; it means the model is uncertain whether the stated condition is true.
+
+## Build a Support Ticket Classifier
+
+A practical Jev AI classification model workflow starts by defining one narrow decision per question. Broad prompts such as “analyze this ticket and decide what to do” combine several judgments and are a poor fit for Jev’s focused design.
+
+A better workflow separates department routing, urgency detection, and frustration scoring:
+
+| Step | Implementation task | Why it matters |
+| --- | --- | --- |
+| 1 | Prepare a concise state | Irrelevant context can reduce accuracy |
+| 2 | Define one judgment per question | Atomic questions are easier to evaluate and test |
+| 3 | Include complete Choice options | Jev cannot return an option that was not supplied |
+| 4 | Send related questions together | Questions using the same state can run in parallel |
+| 5 | Apply thresholds in code | Your application retains control over automation |
+| 6 | Log the model version and outputs | Aliases can point to newer releases over time |
+
+The following Python example uses the official SDK classes and request pattern shown in the [TypeSafe primitives documentation](https://docs.typesafe.ai/primitives.md). It assumes the TypeSafe SDK and credentials have already been configured.
+
+```python
+from typesafe_sdk import Choice, Noul, Score, TypeSafeClient
+
+state = {
+    "ticket_message": (
+        "Our checkout integration has returned errors for 20 minutes, "
+        "and customers cannot complete their orders."
+    )
+}
+
+with TypeSafeClient(model="jev-1.13.0") as client:
+    response = client.system_one(
+        state=state,
+        questions={
+            "department": Choice(
+                instructions=(
+                    "Which department should handle `ticket_message`?"
+                ),
+                criteria={
+                    "billing": "Payment, invoice, or subscription problems.",
+                    "technical": "Software bugs or integration failures.",
+                    "sales": "Pricing, purchasing, or account questions.",
+                    "other": "The request does not fit the listed departments.",
+                },
+            ),
+            "is_urgent": Noul(
+                instructions=(
+                    "Does `ticket_message` describe an urgent or "
+                    "time-sensitive problem?"
+                ),
+            ),
+            "frustration": Score(
+                instructions=(
+                    "How frustrated does the customer appear in "
+                    "`ticket_message`?"
+                ),
+                criteria=[
+                    "Calm and neutral.",
+                    "Concerned but civil.",
+                    "Very angry or using strong language.",
+                ],
+            ),
+        },
+    )
+
+print(response.answers["department"].choice)
+print(response.answers["is_urgent"].noul)
+print(response.answers["frustration"].score)
+```
+
+The example asks three independent questions about one state. Application code can route the selected department, compare the urgency probability with a tested threshold, and use the frustration score for prioritization.
+
+Question IDs such as `department` organize the response but are not substitutes for complete instructions. TypeSafe’s documentation says the model does not receive those IDs, so each `instructions` field must state the full judgment.
+
+When the state is structured, refer to the relevant field explicitly, such as `` `ticket_message` ``. This reduces ambiguity and limits the amount of indirect reasoning the model must perform.
+
+## Design Reliable Classification Rules
+
+The main engineering work is not calling the API. It is defining categories, boundaries, thresholds, and fallback behavior that match the application.
+
+### Keep questions atomic
+
+The Jev AI classification model works best when each question represents one quick judgment. If ticket priority depends on outage severity, customer frustration, and report quality, ask three questions and combine the answers in code.
+
+This approach makes the policy inspectable. Changing the weight assigned to severity becomes a code change rather than a prompt rewrite.
+
+### Treat confidence as a routing signal
+
+Choice and Score answers include probabilities and a confidence value. The official documentation describes confidence as a summary of how concentrated the returned probability distribution is. It should not be interpreted automatically as the probability that the decision is correct.
+
+Choose thresholds using labeled examples from your own workload. A production classifier can:
+
+- Automate high-confidence, low-risk cases.
+- Send uncertain cases to a review queue.
+- Block irreversible actions unless separate business rules pass.
+- Record the full probability distribution for later evaluation.
+
+Do not reuse a threshold across different question types without validation. TypeSafe notes that a Noul probability and the probability attached to a yes-or-no Choice are not structurally interchangeable.
+
+### Include a rejection path
+
+Every closed category list creates a forced-choice risk. If the correct answer is absent, the model must still distribute probability among the available options.
+
+For open-ended traffic, include `other` or `unknown` and define what it means. Human review should remain available when the fallback wins or when the probability distribution is too flat for automatic action.
+
+### Keep deterministic work in code
+
+Use Jev for semantic judgment, not operations that ordinary software can perform exactly. The [Jev 1.13 limitations page](https://docs.typesafe.ai/model-jaggedness/jev-1.13.md) recommends handling arithmetic, counting, date comparison, and similar deterministic tasks in code.
+
+For extraction, first produce a bounded set of candidate values with code or another appropriate tool. Jev can then choose among those candidates. It cannot generate a missing candidate reliably because it is not designed for open-ended generation.
+
+## Model Limits, Pricing, and Deployment Choices
+
+As of the draft date, TypeSafe lists `jev-1.13.0` as the current version. The `jev-latest` and `jev-preview` aliases both point to that version, although aliases may move when new models are released.
+
+| Model detail | Published value |
+| --- | --- |
+| Versioned model ID | `jev-1.13.0` |
+| Published input price | $0.042 per million input tokens |
+| Output-token price | Free |
+| Input formats | Text, JSON object, or array of text values |
+| Media support | No direct image, audio, video, or binary input |
+| Request context budget | 64,000 tokens |
+| State plus longest-question budget | 32,000 tokens |
+| Published rate limits | 250,000 tokens per second and 1,200 requests per minute |
+
+These values come from the official [TypeSafe models and pricing page](https://docs.typesafe.ai/models.md). TypeSafe warns that rate limits are being adjusted dynamically, so check the documentation before planning capacity.
+
+Pinning `jev-1.13.0` gives a deployment stable model behavior until you deliberately upgrade. Using `jev-latest` makes updates easier, but responses can change when the alias advances. The API response identifies the version that handled a request, so recording that field supports debugging and regression analysis.
+
+The Jev AI classification model also has documented qualitative limitations:
+
+| Limitation | Recommended response |
+| --- | --- |
+| Literal interpretation | State exact conditions and boundary cases |
+| Weak counting and arithmetic | Compute results in application code |
+| Unreliable date ordering | Extract components, then compare dates in code |
+| Reduced accuracy with indirection | Point directly to relevant state fields |
+| Distraction from irrelevant context | Filter the state before sending it |
+| Sensitivity to adversarial content | Test hostile and misleading inputs |
+| No open-ended generation focus | Use a generative model when prose is required |
+
+TypeSafe specifically cautions that adversarial text in state can influence Jev’s answer. Treat user-supplied content as untrusted data, define criteria precisely, and maintain authorization and validation outside the model.
+
+## Frequently Asked Questions
+
+### What is the Jev AI classification model used for?
+
+The Jev AI classification model is designed for structured decisions such as ticket routing, document categorization, yes-or-no detection, and scoring against defined levels. It returns typed values that code can evaluate directly.
+
+### Can Jev write emails or summaries?
+
+No. Jev is designed for choices, scores, and truth-probability judgments rather than open-ended writing. Use a generative model when the required output is an email, summary, explanation, or other original prose.
+
+### Should I use `jev-latest` or a versioned model ID?
+
+Use a versioned ID such as `jev-1.13.0` when stable behavior and calibrated thresholds matter. An alias is more convenient for receiving updates, but its underlying version can change. Log the model version returned with every decision.
+
+### Is a high confidence score proof that a classification is correct?
+
+No. Confidence reflects the shape of the model’s probability distribution, not independently verified real-world accuracy. Validate the classifier on representative labeled data, set task-specific thresholds, and provide a review path for uncertain or high-impact decisions.

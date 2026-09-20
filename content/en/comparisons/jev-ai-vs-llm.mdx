@@ -1,0 +1,148 @@
+export const metadata = {
+  "title": "Jev AI vs LLM: Choosing Models for Agent Workflows",
+  "description": "Compare Jev AI vs LLM roles, outputs, use cases, and limits. Learn when structured classification fits, when generation wins, and how agents can use both.",
+  "category": "comparisons",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## Jev AI vs LLM: The Quick Answer
+
+The Jev AI vs LLM choice is structured decision-making versus open-ended language generation: Jev returns typed judgments and probabilities, while an LLM generates text and handles broader reasoning. For practical Jev AI vs LLM selection, use Jev for bounded classification questions and an LLM for writing, conversation, or tasks involving multiple reasoning steps. In an agent, the two model types can complement each other rather than compete for the same role.
+
+## Core Differences Between Jev and an LLM
+
+Jev is a model from TypeSafe AI that the company describes as a System One model. It evaluates a supplied state, answers explicitly defined questions, and returns structured results that application code can use directly.
+
+Jev is not a traditional large language model and is not trained to generate text. The [LangChain guide to Jev](https://www.langchain.com/blog/building-a-harness-with-jev) presents it as a way to move classification decisions out of an agent’s repeated generative-model loop.
+
+| Comparison point | Jev | Traditional LLM |
+|---|---|---|
+| Primary function | Make bounded, structured judgments | Generate language and perform open-ended reasoning |
+| Typical output | Typed answers, probabilities, and applicable confidence data | Generated text or structured output derived through generation |
+| Best-fitting work | Classification, scoring, routing, and binary decisions | Writing, conversation, explanation, and complex reasoning |
+| Text generation | Not trained for it | A core capability |
+| Role in an agent | Handles defined decisions between other operations | Plans, reasons, writes, and chooses broader actions |
+| Relationship | Complements an LLM | Remains necessary when generation is required |
+
+Traditional agents often operate in a loop: a language model decides what to do, a tool runs, the result is evaluated, and the process repeats. Each additional decision can require another model call. Jev is intended to handle suitable intermediate judgments without asking a generative model to compose an answer every time.
+
+TypeSafe reportedly trains Jev using reinforcement learning for calibrated decisions. LangChain also relays TypeSafe’s claims of up to 200 times faster inference and 400 times lower cost than comparable LLMs on classification tasks. Those are company-reported classification figures, not independent Jev AI Guides benchmarks, and they should not be generalized to writing or reasoning tasks Jev does not perform.
+
+### Jev’s Three Decision Types
+
+Jev supports three structured primitives described in the supplied LangChain material:
+
+| Primitive | Question it answers | Returned information |
+|---|---|---|
+| Noul | Is a stated condition true? | Probability that the condition is true |
+| Choice | Which option from a defined set fits best? | Probability for each option and overall confidence |
+| Score | Where does the input fall across ordered levels? | Continuous score, level distribution, and confidence |
+
+For example, a support system could supply a customer message as state and ask a Noul whether it conveys urgency. The response is a probability, not a drafted support reply. Application code can use that result to prioritize the ticket, while an LLM can still write the eventual response.
+
+Jev can evaluate multiple questions about the same state in one request. According to the LangChain guide, those questions are processed in parallel, and adding questions has little effect on response time beyond the tokens used to describe them. This makes the model relevant when one input needs several independent labels.
+
+## When to Choose Jev AI vs LLM
+
+Start by examining the output your software actually needs. A fixed decision that code must consume is a potential Jev task. A new passage of text, an explanation, or an answer that cannot be represented by predefined options remains an LLM task.
+
+| Requirement | Better fit | Reason |
+|---|---|---|
+| Label a message as urgent or not urgent | Jev Noul | The result is a bounded binary judgment |
+| Select one category from known options | Jev Choice | The answer space is already defined |
+| Rate an input as low, medium, or high | Jev Score | The levels are ordered and predetermined |
+| Draft a customer response | LLM | The application needs original text |
+| Explain an unfamiliar technical issue | LLM | The response requires open-ended language |
+| Perform exact arithmetic or date comparison | Application code | The official Jev guidance assigns deterministic computation to code |
+| Classify first and then write a response | Jev plus LLM | The workflow contains both judgment and generation |
+
+A useful Jev AI vs LLM test is whether you can list all valid outputs before the model runs. If the answer is yes, and choosing among them requires semantic judgment, Jev may fit. If the model must create the answer itself, use an LLM.
+
+This distinction also prevents an inefficient workaround. The [Jev 1.13 limitations documentation](https://docs.typesafe.ai/model-jaggedness/jev-1.13.md) warns that forcing generation by chaining many choices is slow and ineffective. When extraction has a bounded answer space, the documentation recommends presenting candidate options through Choice. When genuine generation is required, it recommends a generative model.
+
+### Suitable Jev Roles
+
+Source-supported examples include:
+
+- **Request routing:** Classify a request so an agent can select an appropriate model.
+- **Ticket triage:** Estimate whether a customer message expresses urgency.
+- **Risk classification:** Evaluate a proposed tool call before execution.
+- **Bounded scoring:** Place an input across ordered levels.
+- **Candidate selection:** Choose the best result from a known option set.
+
+These are patterns, not evidence that every deployment will be accurate enough for production. The decision criteria, state quality, thresholds, and edge cases still require application-specific evaluation.
+
+## How to Combine Jev With an LLM
+
+A hybrid design assigns each part of a workflow to the component that matches it. The LLM remains responsible for open-ended work, Jev handles eligible structured judgments, and ordinary code performs exact calculations and enforces rules.
+
+### Step 1: Define the Required Output
+
+Write down the outputs the application accepts. If the output is a boolean condition, finite category, or ordered level, map it to Noul, Choice, or Score. If it is free-form text, keep that step with the LLM.
+
+Do not hide several decisions inside one broad question. The TypeSafe documentation recommends direct instructions and separately defined judgments, particularly when multiple interpretations are possible.
+
+### Step 2: Prepare Focused State
+
+Provide only the information relevant to the decision. Jev can receive text, structured data, or LangChain messages through the integration described by LangChain, but a larger state is not automatically better.
+
+The official limitations page says irrelevant detail can distract Jev 1.13 and reduce accuracy. Filter or retrieve the relevant fields in code before calling the model. This also makes incorrect results easier to investigate.
+
+### Step 3: Write Literal Criteria
+
+State the exact condition Jev should evaluate. Include important boundaries and avoid double negatives, implied exceptions, or criteria that conflict with the main instruction.
+
+Jev 1.13 can interpret wording literally. If a result seems wrong because the model missed an unstated intention, that intention belongs in the criteria. When one instruction still requires multiple interpretive hops, split it into simpler questions and combine the results in code.
+
+### Step 4: Keep Deterministic Logic in Code
+
+Counting, arithmetic, date ordering, and duration calculations should not be delegated to Jev. Extract bounded semantic information when a model is needed, then let code calculate the exact result.
+
+For example, the TypeSafe documentation recommends extracting date components through enumerated choices and including a “not stated” option. Code should then assemble the date, compare values, calculate offsets, and enforce calendar rules.
+
+### Step 5: Send Generative Work to the LLM
+
+After classification or routing, call an LLM only when the workflow needs generated language or open-ended reasoning. A support pipeline might use Jev to identify urgency and topic, code to apply escalation policy, and an LLM to draft a context-sensitive response.
+
+That division is the central practical conclusion of Jev AI vs LLM architecture: model selection should happen at the task level, not once for the entire application.
+
+## Limits and Deployment Checks
+
+The Jev AI vs LLM comparison must include Jev’s documented weaknesses. The following caveats apply specifically to `jev-1.13`, according to TypeSafe’s page last reviewed September 17, 2026.
+
+| Jev 1.13 limitation | Practical response |
+|---|---|
+| Literal interpretation | Specify exact conditions and boundary cases |
+| Unreliable counting and arithmetic | Calculate with code |
+| Weak date and time comparison | Extract components, then compare in code |
+| Difficulty with indirection | Reduce reasoning hops and name relevant state |
+| Distraction from irrelevant context | Filter the state before evaluation |
+| Sensitivity to adversarial content | Use precise criteria and test hostile inputs |
+| Conflicting instructions and criteria | Align both around the same decision |
+| No guaranteed arithmetic relationship between separate outputs | Enforce required identities in code |
+| Poor fit for generation | Use an LLM when text must be created |
+
+Do not assume that two differently framed questions will produce mathematically complementary probabilities. TypeSafe documents cases where a Noul and a Choice about similar concepts differ, as well as cases where probabilities for a statement and its negation do not sum to one.
+
+Thresholds also should not be transferred blindly between primitive types. A Choice compares available options, while separate Nouls evaluate each condition independently. Tune and evaluate the exact question format used by the application.
+
+Finally, treat untrusted state as data that can influence the result. The Jev 1.13 documentation says adversarial instructions or misleading framing inside the state may move its answer. Precise criteria and testing are necessary, especially before using a classification to authorize consequential actions.
+
+## Jev AI vs LLM FAQ
+
+### Is Jev an LLM?
+
+No. Jev is described as a System One model for typed, structured decisions. It evaluates state and returns probabilities or other structured classification data instead of generating text.
+
+### Can Jev replace an LLM in an agent?
+
+Not completely. Jev can replace some LLM calls used only for bounded classification, routing, or scoring. An LLM is still needed for writing, conversation, open-ended explanations, and broader reasoning.
+
+### What is the simplest Jev AI vs LLM decision rule?
+
+Use Jev when the valid answers are defined in advance and semantic judgment is required. Use an LLM when the answer must be generated. Use ordinary code when the result can be calculated exactly.
+
+### What should be tested before deploying Jev?
+
+Test literal wording, boundary cases, irrelevant context, adversarial state, conflicting criteria, confidence thresholds, and each primitive independently. Also verify that arithmetic, dates, and structural rules remain in deterministic code rather than relying on model probabilities.

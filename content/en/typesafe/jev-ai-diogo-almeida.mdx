@@ -1,0 +1,142 @@
+export const metadata = {
+  "title": "Jev AI Diogo Almeida: How TypeSafe AI Decisions Work",
+  "description": "Learn what Jev AI Diogo Almeida means, how TypeSafe's structured decision model works, which workflows fit, and what limits developers should consider.",
+  "category": "typesafe",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What Jev AI Diogo Almeida Means
+
+**Jev AI Diogo Almeida** refers to Jev, the structured decision model developed by TypeSafe AI, and Diogo Almeida, the former OpenAI researcher who started the company. The key to understanding **Jev AI Diogo Almeida** is that Jev produces predefined values and probability distributions for software, rather than open-ended prose for people. This tutorial explains how that approach works, how to design an appropriate workflow, and where the documented limits apply.
+
+[TechCrunch reports](https://techcrunch.com/2026/09/18/a-new-kind-of-ai-model-from-a-chatgpt-inventor-is-thrilling-developers/) that Almeida helped build ChatGPT and worked on reinforcement learning from human feedback, or RLHF. He later left OpenAI to establish TypeSafe after concluding that language-focused models were often a poor match for software automation.
+
+TypeSafe calls Jev its flagship model and first “System One model.” The [official TypeSafe introduction](https://docs.typesafe.ai/introduction.md) defines this category around fast, structured judgments: an application supplies a state and one or more typed questions, and Jev returns values the application can use directly.
+
+| Topic | Source-supported fact |
+|---|---|
+| Diogo Almeida | A former OpenAI researcher who helped build ChatGPT and worked on RLHF |
+| TypeSafe AI | The company Almeida started after leaving OpenAI |
+| Jev | TypeSafe’s flagship model and first System One model |
+| Primary behavior | Evaluates typed questions against supplied state |
+| Output style | Structured answers, probabilities, and confidence rather than generated prose |
+| Name | A reference to economist William Stanley Jevons and Jevons’ paradox |
+
+The Jev name reflects Almeida’s broader argument about cost. According to TechCrunch, he expects cheaper machine intelligence to encourage wider deployment, much as Jevons’ paradox describes increased consumption when a resource becomes less expensive.
+
+## How Jev AI Diogo Almeida Works
+
+The central **Jev AI Diogo Almeida** concept is a separation between language generation and software decisions. A conventional chat model is built to continue or generate text. Jev instead evaluates a defined question and returns an answer from a constrained output space.
+
+A request begins with **state**, meaning the information Jev should evaluate. The official model documentation says state may be a text string, a JSON object, or an array of text values. Jev currently accepts text only, so images, audio, video, and binary files must first be converted into text or structured fields.
+
+The request also contains typed questions. TypeSafe documents three primitives that can be included together in one call:
+
+| Primitive | Question it answers | Documented result |
+|---|---|---|
+| Choice | Which option should be selected from a list? | Choice, probabilities, and confidence |
+| Score | Where does the state fall on a defined rubric? | Score, probabilities, and confidence |
+| Noul | Is a statement true? | A value from 0 to 1 |
+
+These primitives support different application decisions. A Choice question could select among predefined categories. A Score question could measure one clearly defined quality against a rubric. A Noul question could estimate whether a specific statement is true.
+
+TypeSafe says questions in the same request are evaluated independently and in parallel against the shared state. Adding a question therefore does not make another question depend on it. This design also means developers should not expect Jev to construct a long chain of reasoning across several prompts.
+
+That distinction matters. Jev is designed for structured decisions and does not replace generative chat models for writing, summarization into open-ended prose, conversation, or other text-generation tasks. It may instead sit before or after a generative model as a classifier, router, or narrowly scoped evaluator.
+
+## A Practical Workflow for Typed Decisions
+
+A useful **Jev AI Diogo Almeida** workflow starts by converting a broad business question into small, testable judgments. TypeSafe’s guidance is to make each question atomic: one question should assess one factor that a knowledgeable person could judge quickly from the supplied context.
+
+Suppose a team needs to evaluate incoming product requests. “Is this a good request?” is too broad because it mixes customer value, technical feasibility, differentiation, and urgency. A better design asks about each dimension separately and combines the results in application code.
+
+| Step | Action | Purpose |
+|---|---|---|
+| 1 | Define the software decision | Establish what the application will do with the result |
+| 2 | Assemble the relevant state | Give the model the record, text, or reference material needed |
+| 3 | Split broad judgments into atomic questions | Prevent unrelated criteria from being blended together |
+| 4 | Select Choice, Score, or Noul | Match each question to a documented output type |
+| 5 | Define options, instructions, or criteria | Encode domain rules in the request |
+| 6 | Combine results in code | Keep weighting and business policy explicit |
+| 7 | Apply confidence handling | Route uncertain results for another process or review |
+| 8 | Log the returned model version | Preserve traceability when aliases change |
+
+For example, market potential, implementation feasibility, and product differentiation should be separate Score questions. The application can then apply its own weighting formula. If priorities change, developers can adjust that formula without turning the prompt into a hidden policy engine.
+
+The same principle applies to classification. Define categories that correspond to real application branches, rather than asking for an unrestricted label. Because a Choice result includes probabilities and confidence, the application can distinguish a strong preference from an ambiguous classification.
+
+Confidence should be treated as an input to policy, not as a guarantee. TechCrunch quotes open-source developer Armin Ronacher explaining that users must decide what to do when a probability is near an uncertain midpoint versus when it is much higher. TypeSafe’s model documentation likewise advises teams that tune thresholds to pin a model version and upgrade deliberately.
+
+This produces a practical control structure:
+
+- High-confidence results can follow the application’s approved automated path.
+- Ambiguous results can be deferred, reviewed, or sent to another system.
+- Multiple scores can be combined with transparent code-level weights.
+- Model IDs and returned probabilities can be logged for later evaluation.
+
+These are architectural interpretations of the documented outputs, not universal thresholds. The supplied sources do not prescribe a confidence cutoff that is correct for every workflow.
+
+## Where Jev Fits and Where It Does Not
+
+The strongest **Jev AI Diogo Almeida** use cases involve frequent, narrow decisions with known output types. TechCrunch describes developer interest in command-safety classification, business-email classification, agent monitoring, and model routing. Those accounts are third-party examples reported by the publication, not independently verified production benchmarks from this guide.
+
+The model-routing example illustrates the intended economics. An application could classify a workload before selecting another model, avoiding an open-ended language-generation call for the routing step. Agent monitoring follows a similar pattern: Jev can evaluate a trace against a defined concern without being asked to generate another agent response.
+
+| Workload | Jev fit | Reason |
+|---|---|---|
+| Selecting one predefined category | Strong conceptual fit | Choice returns a selected option and probabilities |
+| Scoring one defined quality | Strong conceptual fit | Score evaluates a supplied rubric |
+| Testing a specific proposition | Strong conceptual fit | Noul returns a 0–1 value |
+| Combining several independent factors | Fit with application logic | Each factor can be evaluated separately |
+| Writing an article or email | Poor fit | Jev does not generate open-ended text |
+| Extended multi-step reasoning | Poor fit | System One questions are intended to be narrow judgments |
+| Direct image, audio, or video analysis | Unsupported input | The current model accepts text only |
+
+TechCrunch reports that one Vercel engineer observed faster and more accurate command classification after replacing an OpenAI model with Jev. It also reports that a Bryo AI executive found Gemini slightly more accurate in an email-classification test but considerably more expensive, while valuing Jev’s probability output.
+
+Those results should be read as community examples under particular test conditions. The article does not provide enough methodology to generalize them, and TypeSafe’s official documentation does not claim that Jev will outperform a particular competitor on every dataset.
+
+## Models, Pricing, and Documented Limits
+
+Any **Jev AI Diogo Almeida** implementation should account for the current model constraints. According to the [official TypeSafe models page](https://docs.typesafe.ai/models.md), all listed models use `POST /v1/systemone`, with the request’s model field selecting the version.
+
+| Parameter | Jev 1.13 documentation |
+|---|---|
+| Versioned model ID | `jev-1.13.0` |
+| Stable alias | `jev-latest` |
+| Preview alias | `jev-preview` |
+| Input price | $42 per billion tokens, or $0.042 per million tokens |
+| Output price | Free |
+| Rate limits | 250,000 tokens per second and 1,200 requests per minute |
+| Overall request context | 64,000 tokens |
+| State plus longest question | 32,000 tokens |
+| Input modalities | Text only |
+
+TypeSafe warns that rate limits are adjusting dynamically and may change without notice. Direct API clients should also be prepared for `429 Too Many Requests` responses, while the documented SDKs retry with backoff and honor a `retry-after` header when present.
+
+Aliases require operational care. `jev-latest` can move when a stable release ships, potentially changing answers without an application change. The response reports the versioned model ID, so teams can record which version produced a decision. Applications with calibrated thresholds should pin `jev-1.13.0` or another tested version until the next version has been evaluated.
+
+The model also has language and data limitations. English is its primary training language and documented area of best accuracy. TypeSafe says other languages are accepted but may not perform equally well, so non-English workloads require evaluation on representative content and careful confidence handling.
+
+TypeSafe states that customer requests and responses are not used to train Jev. It also says the shared model is not fine-tuned or LoRA-adapted for individual customers. Domain behavior instead comes from the supplied state and the instructions or criteria attached to each question.
+
+Finally, the architecture is not fully public in the supplied evidence. TechCrunch says Almeida did not disclose detailed architecture and reports that outside observers suspect an open-weight model may be involved. That remains speculation, not an established technical fact.
+
+## FAQ About Jev AI and Diogo Almeida
+
+### What is Jev AI Diogo Almeida?
+
+**Jev AI Diogo Almeida** is a search phrase connecting TypeSafe’s Jev decision model with company founder Diogo Almeida. Jev accepts text-based state and typed questions, then returns structured decisions and probability information for software to use.
+
+### Is Jev an LLM for writing text?
+
+TypeSafe and TechCrunch describe Jev as a transformer-based System One model rather than an open-ended large language model. It does not produce prose responses, so it is not a replacement for chat, article writing, or creative text generation.
+
+### Can Jev evaluate several questions in one request?
+
+Yes. TypeSafe documents that Choice, Score, and Noul questions can be mixed in one call. Each question is evaluated independently and in parallel against the same state.
+
+### Does Jev eliminate uncertainty?
+
+No. Its constrained outputs avoid relying on free-form text parsing, but decisions still carry probabilities or confidence information. Developers remain responsible for validating performance, setting workflow policies, handling uncertain cases, and testing each model version on representative data.

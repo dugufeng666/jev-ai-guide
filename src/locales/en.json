@@ -1,0 +1,419 @@
+{
+  "site": {
+    "name": "Jev AI Guides",
+    "shortName": "Jev AI",
+    "tagline": "Independent Jev AI Tutorial Guides",
+    "description": "A practical tutorial hub for Jev AI, TypeSafe's System One model for fast structured decisions, API examples, integrations, and limitations.",
+    "legalNotice": "Independent tutorial site. Not affiliated with TypeSafe AI."
+  },
+  "nav": {
+    "guide": "Guide",
+    "model": "Model",
+    "api": "Api",
+    "typesafe": "Typesafe",
+    "agent": "Agent",
+    "integrations": "Integrations",
+    "comparisons": "Comparisons",
+    "community": "Community"
+  },
+  "home": {
+    "meta": {
+      "title": "Jev AI Guides — Tutorials, API Examples, TypeSafe Jev",
+      "description": "Learn what Jev AI is, how TypeSafe Jev works, and how to build fast decision workflows with tutorials, API examples, use cases, and integrations."
+    },
+    "hero": {
+      "eyebrow": "Independent Guides Hub",
+      "title": "Jev AI",
+      "description": "Learn Jev AI from the ground up: what TypeSafe's System One model does, when to use Choice, Score, and Noul, and how to build fast structured decision workflows without treating Jev like a chatbot.",
+      "stats": [
+        "System One model",
+        "Choice / Score / Noul",
+        "Closed-source API",
+        "TypeSafe docs",
+        "Cloudflare model page"
+      ],
+      "primaryCta": "Start Beginner Guide",
+      "secondaryCta": "Explore API Guides",
+      "tertiaryCta": "Compare with LLMs",
+      "videoLabel": "Jev AI overview"
+    },
+    "updates": {
+      "title": "Latest Articles",
+      "browse": "Browse Guide Library",
+      "viewAll": "View All"
+    },
+    "start": {
+      "eyebrow": "Start Here",
+      "title": "Your Jev AI Journey",
+      "cards": [
+        {
+          "number": "1",
+          "title": "Beginner Guide",
+          "description": "Learn what Jev AI is, what it is built for, and why its output is structured decisions instead of free-form chat."
+        },
+        {
+          "number": "2",
+          "title": "API Quickstart",
+          "description": "Understand the basic request flow before building a small classifier, router, or scoring workflow with the Jev API."
+        },
+        {
+          "number": "3",
+          "title": "Decision Primitives",
+          "description": "Compare Choice, Score, and Noul so you can match each primitive to the right kind of product decision."
+        },
+        {
+          "number": "4",
+          "title": "Agent Routing",
+          "description": "Use Jev AI as a fast decision layer for tool selection, moderation gates, workflow triage, and review queues."
+        }
+      ]
+    },
+    "popular": {
+      "eyebrow": "Popular Pages",
+      "title": "Core Jev AI Topics",
+      "quickLinks": [
+        "Beginner Guide",
+        "API",
+        "Integrations",
+        "Comparisons",
+        "Limitations"
+      ],
+      "cards": []
+    },
+    "aboutGame": {
+      "title": "What is Jev AI?",
+      "paragraphs": [
+        "Jev AI is TypeSafe's structured decision model for applications that need fast, typed answers such as a selected category, a numeric score, or a yes-or-no judgment. It is built for product logic, routing, scoring, and classification rather than long-form text generation.",
+        "Jev AI Guides collects beginner explanations, API patterns, integration notes, model comparisons, and practical use cases in one tutorial hub for builders who want to understand where Jev AI fits inside real software workflows."
+      ],
+      "stats": [
+        {
+          "label": "Developer",
+          "value": "TypeSafe AI"
+        },
+        {
+          "label": "Platform",
+          "value": "Cloud API"
+        },
+        {
+          "label": "Model Type",
+          "value": "System One"
+        },
+        {
+          "label": "Primary Output",
+          "value": "Structured decisions"
+        },
+        {
+          "label": "Core Primitives",
+          "value": "Choice / Score / Noul"
+        },
+        {
+          "label": "Use Cases",
+          "value": "Routing, scoring, triage"
+        }
+      ],
+      "cta": "Explore All Guides"
+    },
+    "explore": {
+      "title": "Explore Jev AI Guides",
+      "description": "Use these focused modules to move from Jev AI basics to API usage, decision primitives, integrations, agent routing, comparisons, source research, and practical use cases.",
+      "modules": [
+        {
+          "order": 1,
+          "name": "Jev AI Beginner Guide",
+          "description": "Start here if you want the clean mental model: Jev AI handles bounded decisions, while generative models handle writing and open-ended reasoning.",
+          "href": "#",
+          "displayType": "step-by-step",
+          "highlights": [
+            {
+              "label": "1",
+              "detail": "Learn the difference between structured decisions and free-form generation."
+            },
+            {
+              "label": "2",
+              "detail": "Identify the state your application can safely send into a decision call."
+            },
+            {
+              "label": "3",
+              "detail": "Choose a narrow question your code can act on immediately."
+            },
+            {
+              "label": "4",
+              "detail": "Route the typed result into product logic, review queues, or analytics."
+            }
+          ]
+        },
+        {
+          "order": 2,
+          "name": "Jev AI API Quickstart",
+          "description": "Follow a practical setup path for turning a product decision into a Jev AI request and reading the response in application code.",
+          "href": "#",
+          "displayType": "step-by-step",
+          "highlights": [
+            {
+              "label": "1",
+              "detail": "Define the user input, event, document, ticket, or agent state to evaluate."
+            },
+            {
+              "label": "2",
+              "detail": "Select the primitive that matches the output your application expects."
+            },
+            {
+              "label": "3",
+              "detail": "Send the request through the TypeSafe API or supported provider route."
+            },
+            {
+              "label": "4",
+              "detail": "Use the returned decision as a typed signal in your workflow."
+            }
+          ]
+        },
+        {
+          "order": 3,
+          "name": "Jev AI Decision Primitives",
+          "description": "Understand the three core Jev AI primitives and the product situations where each one makes sense.",
+          "href": "#",
+          "displayType": "card-list",
+          "highlights": [
+            {
+              "label": "Choice",
+              "detail": "Pick one option from a defined set such as ticket type, next tool, or moderation category."
+            },
+            {
+              "label": "Score",
+              "detail": "Rate an ordered scale such as urgency, quality, intent strength, or customer sentiment."
+            },
+            {
+              "label": "Noul",
+              "detail": "Answer a bounded yes-or-no question for filters, gates, checks, and simple classifiers."
+            },
+            {
+              "label": "Batch",
+              "detail": "Ask several related decisions over the same input so the workflow can branch cleanly."
+            }
+          ]
+        },
+        {
+          "order": 4,
+          "name": "Jev AI Integration Guide",
+          "description": "Map the major ways developers can reach Jev AI, from official TypeSafe material to provider and framework entry points.",
+          "href": "#",
+          "displayType": "card-list",
+          "highlights": [
+            {
+              "label": "TypeSafe",
+              "detail": "Use official TypeSafe pages as the starting point for product positioning and API details."
+            },
+            {
+              "label": "Cloudflare",
+              "detail": "Review the Cloudflare model page when planning Workers AI style deployment paths."
+            },
+            {
+              "label": "Vercel",
+              "detail": "Track Vercel AI Gateway context for frontend and AI SDK oriented workflows."
+            },
+            {
+              "label": "OpenRouter",
+              "detail": "Compare provider routing options when experimenting with model access layers."
+            }
+          ]
+        },
+        {
+          "order": 5,
+          "name": "Jev AI Agent Routing",
+          "description": "Use Jev AI as a fast decision layer inside agents where each step needs a bounded routing or evaluation choice.",
+          "href": "#",
+          "displayType": "step-by-step",
+          "highlights": [
+            {
+              "label": "1",
+              "detail": "List the allowed tools, actions, or branches before the agent asks for a decision."
+            },
+            {
+              "label": "2",
+              "detail": "Send compact state instead of a full conversation whenever the decision is local."
+            },
+            {
+              "label": "3",
+              "detail": "Route to the selected tool, category, review path, or stop condition."
+            },
+            {
+              "label": "4",
+              "detail": "Keep permissions, payments, deletion, and account changes behind application rules."
+            }
+          ]
+        },
+        {
+          "order": 6,
+          "name": "Jev AI Model Comparison",
+          "description": "Compare Jev AI with broader model choices so each workflow uses the right tool for the job.",
+          "href": "#",
+          "displayType": "tier-grid",
+          "highlights": [
+            {
+              "label": "S",
+              "detail": "Jev AI fits structured routing, classification, triage, scoring, and guardrail decisions."
+            },
+            {
+              "label": "A",
+              "detail": "Generative LLMs fit writing, chat, brainstorming, planning, and open-ended synthesis."
+            },
+            {
+              "label": "B",
+              "detail": "Traditional classifiers fit stable labels, fixed datasets, and mature evaluation pipelines."
+            },
+            {
+              "label": "C",
+              "detail": "Deterministic code fits exact math, dates, permissions, billing, and irreversible actions."
+            }
+          ]
+        },
+        {
+          "order": 7,
+          "name": "Jev AI Source Library",
+          "description": "Keep research organized by separating official pages, provider documentation, technical demos, and community experiments.",
+          "href": "#",
+          "displayType": "card-list",
+          "highlights": [
+            {
+              "label": "Docs",
+              "detail": "Official TypeSafe documentation for model concepts, API surface, and implementation details."
+            },
+            {
+              "label": "Blog",
+              "detail": "TypeSafe launch and technical posts that explain System One model positioning."
+            },
+            {
+              "label": "Provider",
+              "detail": "Cloudflare, Vercel, and other provider pages for deployment and access context."
+            },
+            {
+              "label": "Video",
+              "detail": "Tutorial and showcase videos that demonstrate use cases and developer workflows."
+            }
+          ]
+        },
+        {
+          "order": 8,
+          "name": "Jev AI Use Cases",
+          "description": "Turn the core idea into concrete product patterns that can become tutorial pages, comparison pages, and implementation examples.",
+          "href": "#",
+          "displayType": "card-list",
+          "highlights": [
+            {
+              "label": "Support",
+              "detail": "Classify tickets, score urgency, and route customer requests to the right queue."
+            },
+            {
+              "label": "Moderation",
+              "detail": "Check content against bounded labels before sending edge cases to review."
+            },
+            {
+              "label": "Search",
+              "detail": "Rank, filter, and categorize documents, clips, or pages for downstream workflows."
+            },
+            {
+              "label": "Agents",
+              "detail": "Choose tools, stop conditions, review paths, and next actions inside agent loops."
+            }
+          ]
+        }
+      ]
+    },
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "description": "Quick answers to the most common questions about Jev AI.",
+      "items": [
+        {
+          "question": "What is Jev AI?",
+          "answer": "Jev AI is TypeSafe's structured decision model for applications that need typed outputs such as a category, score, or yes-or-no answer."
+        },
+        {
+          "question": "What is Jev AI used for?",
+          "answer": "Jev AI is used for routing, classification, scoring, moderation checks, workflow triage, support queues, and agent tool-selection decisions."
+        },
+        {
+          "question": "Can Jev AI write articles or chat like ChatGPT?",
+          "answer": "Jev AI is designed for bounded decisions, not long-form writing or open-ended chat. For writing and conversation, pair Jev AI with a generative model."
+        },
+        {
+          "question": "Where should beginners start with Jev AI?",
+          "answer": "Beginners should start with the Jev AI beginner guide, then learn the Choice, Score, and Noul primitives before building an API workflow."
+        }
+      ]
+    },
+    "finalCta": {
+      "title": "Ready to Understand Jev AI?",
+      "description": "Start with the source-backed beginner guide, then move into API examples, integration notes, and practical agent workflow patterns.",
+      "primary": "Read the Beginner Guide",
+      "secondary": "Visit TypeSafe Docs"
+    }
+  },
+  "shared": {
+    "updated": "Updated",
+    "inThisSection": "In this section",
+    "tableOfContents": "Table of Contents",
+    "nextSteps": "Next Steps",
+    "needHelp": "Need Help?",
+    "relatedReading": "Related Reading",
+    "relatedGuides": "Related Guides",
+    "readMore": "Read more",
+    "officialMedia": "Jev AI media",
+    "home": "Home",
+    "noGuidesAvailable": "No guides available yet. Check back soon!",
+    "sidebarTitle": "Start Here",
+    "viewAllGuides": "View key guides",
+    "guideNavigation": "Guide Navigation"
+  },
+  "footer": {
+    "aboutTitle": "Jev AI Guides",
+    "about": "Jev AI Guides is an independent tutorial hub for developers learning TypeSafe Jev, System One model concepts, API usage, integrations, and practical limitations.",
+    "quickLinks": "Quick Links",
+    "guides": "Guides",
+    "legal": "Legal",
+    "copyright": "2026 Jev AI Guides. Independent resource; not affiliated with TypeSafe AI.",
+    "description": "Independent Jev AI tutorials for TypeSafe Jev, structured decisions, API examples, integrations, and comparisons.",
+    "playGame": "TypeSafe Website",
+    "officialDiscord": "TypeSafe Docs",
+    "officialYoutube": "TypeSafe Blog",
+    "cloudflareModel": "Cloudflare Jev Model",
+    "beginnerGuide": "Beginner Guide",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service",
+    "modelGuides": "Model Guides",
+    "apiGuides": "API Guides",
+    "integrationGuides": "Integrations"
+  },
+  "guide": {
+    "overviewTitle": "Jev AI Guides Overview",
+    "overviewDescription": "Beginner-friendly tutorials explaining Jev AI, practical usage, setup paths, and source-backed learning routes."
+  },
+  "model": {
+    "overviewTitle": "Jev AI Model Overview",
+    "overviewDescription": "Model-focused articles on System One design, structured outputs, classification, decision primitives, and calibration context."
+  },
+  "typesafe": {
+    "overviewTitle": "Jev AI Typesafe Overview",
+    "overviewDescription": "Source-backed notes about TypeSafe AI, Jev documentation, RLCD, GitHub resources, and founder context."
+  },
+  "agent": {
+    "overviewTitle": "Jev AI Agent Overview",
+    "overviewDescription": "Agent workflow guides for tool routing, automation, browser actions, structured decisions, and review gates."
+  },
+  "integrations": {
+    "overviewTitle": "Jev AI Integrations Overview",
+    "overviewDescription": "Integration notes for Cloudflare, Vercel, OpenRouter, Node.js, Rust, and provider routing around Jev AI."
+  },
+  "comparisons": {
+    "overviewTitle": "Jev AI Comparisons Overview",
+    "overviewDescription": "Compare Jev AI with ChatGPT, Claude, and general LLMs for structured decisions versus text generation."
+  },
+  "community": {
+    "overviewTitle": "Jev AI Community Overview",
+    "overviewDescription": "Community examples, use cases, video topics, and fake-demo checks separated from official documentation claims."
+  },
+  "api": {
+    "overviewTitle": "Jev AI Api Overview",
+    "overviewDescription": "API tutorials covering docs, quickstarts, pricing notes, SDK context, and implementation boundaries for Jev AI."
+  }
+}

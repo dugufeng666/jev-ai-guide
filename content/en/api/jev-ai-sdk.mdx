@@ -1,0 +1,237 @@
+export const metadata = {
+  "title": "Jev AI SDK Tutorial: Typed Decisions in Python and TS",
+  "description": "Learn the jev ai sdk with a practical Python workflow: install TypeSafe's client, ask typed questions, read confidence, and route results safely in code.",
+  "category": "api",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What Is the Jev AI SDK?
+
+The **jev ai sdk** is TypeSafe AI's Python and JavaScript client for sending text-based state to Jev and receiving typed decisions instead of generated prose. With the **jev ai sdk**, an application can classify an item, score it on an ordered scale, or estimate the probability that a statement is true. This independent tutorial explains the documented interface and its practical limits; it is not an official TypeSafe resource.
+
+Jev is described as a System One model: it handles focused judgments that a knowledgeable person could make quickly when given the right context. It is designed for structured decisions, not writing, summarization, code generation, or other open-ended text tasks.
+
+That distinction determines where Jev belongs in an application. It can choose a support queue or estimate whether a refund was requested, but it cannot compose the response sent to the customer.
+
+| Capability | Appropriate primitive | Returned value |
+| --- | --- | --- |
+| Select one known category | Choice | Selected option, probabilities, and confidence |
+| Measure a position on a spectrum | Score | Numeric position, legend, probabilities, and confidence |
+| Evaluate a yes-or-no statement | Noul | Probability from 0 to 1 |
+| Generate an explanation or email | Not supported | Use a generative model or application code |
+
+These answer shapes come from TypeSafe's official [primitives documentation](https://docs.typesafe.ai/primitives.md). Every question is evaluated against the state supplied in the same request.
+
+## Set Up the Jev AI SDK
+
+The Python package is `typesafe-sdk`, while the JavaScript and TypeScript package is `@typesafe-ai/sdk`. The supplied practical guide documents Python 3.10 or newer and Node.js 20 or newer as its setup requirements.
+
+Install one client with the package manager used by your project:
+
+```bash
+pip install typesafe-sdk
+```
+
+```bash
+npm install @typesafe-ai/sdk
+```
+
+The clients read the `TYPESAFE_API_KEY` environment variable and use `jev-latest` by default, according to the supplied [Jev setup guide](https://dev.to/valyuai/how-to-use-jev-a-practical-guide-to-typesafes-system-one-model-g5e). API keys are managed through TypeSafe's console, subject to its current access process.
+
+```bash
+export TYPESAFE_API_KEY="sk-..."
+```
+
+Do not put the key in source code, browser bundles, or committed configuration. A server-side environment variable or managed secret store keeps the credential outside the application repository.
+
+The documented model aliases currently resolve as follows:
+
+| Model name | Documented target | Recommended use |
+| --- | --- | --- |
+| `jev-latest` | `jev-1.13.0` | Following the current stable release |
+| `jev-preview` | `jev-1.13.0` | Following the newest available release |
+| `jev-1.13.0` | Fixed version | Keeping evaluated behavior stable |
+
+Aliases can move when another release is published. TypeSafe advises pinning the version when confidence thresholds have been tuned for a particular model and logging the version returned in the response. See the official [TypeSafe model reference](https://docs.typesafe.ai/models.md) for the current mapping.
+
+## Make a Typed Decision in Python
+
+A useful **jev ai sdk** tutorial needs a complete workflow, not just a client initialization. The following example is based directly on TypeSafe's documented customer-support pattern and asks three independent questions in one request.
+
+```python
+from typesafe_sdk import Choice, Noul, Score, TypeSafeClient
+
+state = {
+    "ticket_message": (
+        "My flight was cancelled. Can I get a refund? "
+        "I need an answer before tomorrow."
+    ),
+    "refund_policy": (
+        "Cancelled flights are eligible for a full refund."
+    ),
+}
+
+with TypeSafeClient(model="jev-1.13.0") as client:
+    response = client.system_one(
+        state=state,
+        questions={
+            "refund_requested": Noul(
+                instructions=(
+                    "Does `ticket_message` request a refund?"
+                ),
+            ),
+            "request_type": Choice(
+                instructions=(
+                    "What is the main request in "
+                    "`ticket_message`?"
+                ),
+                criteria={
+                    "refund": (
+                        "The customer wants money returned."
+                    ),
+                    "rebooking": (
+                        "The customer wants a replacement flight."
+                    ),
+                    "information": (
+                        "The customer only wants information."
+                    ),
+                    "other": (
+                        "The request does not fit another option."
+                    ),
+                },
+            ),
+            "urgency": Score(
+                instructions=(
+                    "How urgent is the request in "
+                    "`ticket_message`?"
+                ),
+                criteria=[
+                    "No deadline or urgency is expressed.",
+                    "A deadline is mentioned but is not immediate.",
+                    "The request needs immediate attention.",
+                ],
+            ),
+        },
+    )
+
+refund_probability = response.answers["refund_requested"].noul
+request = response.answers["request_type"]
+urgency = response.answers["urgency"]
+
+print(refund_probability)
+print(request.choice, request.confidence)
+print(urgency.score, urgency.confidence)
+print(response.model)
+```
+
+This request sends the state once. Jev then evaluates the Noul, Choice, and Score questions independently and returns each answer under the identifier assigned by the application.
+
+The **jev ai sdk** answer fields have different meanings:
+
+| Primitive | Primary field | How application code can use it |
+| --- | --- | --- |
+| Noul | `noul` | Compare the probability with an evaluated threshold |
+| Choice | `choice` | Select a predefined code path |
+| Choice | `confidence` | Decide whether to automate or request review |
+| Score | `score` | Compare a position on the defined scale |
+| Score | `legend` | Map numeric levels back to their descriptions |
+| Choice or Score | `probabilities` | Inspect the full distribution instead of only the selected result |
+
+A Noul value near 1 indicates stronger support for yes, while a value near 0 indicates stronger support for no. A value near 0.5 means the model gives yes and no similar probability. Noul does not have a separate confidence field because its probability is already the relevant signal.
+
+Choice and Score include confidence. For Score, the returned position can fall between the levels rather than being restricted to an integer index. These behaviors are documented in the [TypeSafe primitives reference](https://docs.typesafe.ai/primitives.md).
+
+No universal threshold is documented for every application. Measure results on representative labeled data, then choose thresholds according to the cost of an incorrect action. A read-only routing suggestion may tolerate more uncertainty than an irreversible account or payment action.
+
+## Design Better Questions and Workflows
+
+The **jev ai sdk** works best when each question represents one narrow judgment. An instruction such as “Does the message explicitly request a refund?” is more suitable than “Analyze the customer and decide everything we should do.”
+
+When a decision depends on several dimensions, ask several questions and combine their outputs in ordinary code. For example, ticket priority could use separate Scores for operational impact, customer frustration, and the quality of reproduction details. The application can then apply its own weights and change them without rewriting the model instructions.
+
+Use these rules when creating a request:
+
+- Put relevant text, records, and policies in `state`.
+- Name structured fields explicitly in instructions, such as `ticket_message`.
+- Give every Choice option a clear and nonoverlapping definition.
+- Add `other` or `none of the above` when the listed options are not exhaustive.
+- Describe every Score level in observable terms.
+- Use Noul for a defined yes-or-no condition, not a vague degree of quality.
+- Keep arithmetic, counting, and deterministic rules in code.
+
+Questions that use the same state should generally be sent together. TypeSafe says Jev ingests the state once and evaluates questions in parallel, so adding related questions mainly adds their input tokens rather than requiring the state to be submitted repeatedly.
+
+This pattern is sometimes called speculative fan-out. An application can ask about refund intent, urgency, department, and frustration at once, then ignore answers that do not matter for the selected branch.
+
+Questions in one request remain independent. One answer does not become hidden context for another. Make a second request only when an earlier answer is genuinely required to fetch new evidence, construct a different state, or determine the next set of options.
+
+A practical routing policy might look like this conceptual logic:
+
+```python
+request = response.answers["request_type"]
+
+if request.confidence < 0.60:
+    route_to_manual_review()
+elif request.choice == "refund":
+    start_refund_review()
+elif request.choice == "rebooking":
+    open_rebooking_flow()
+else:
+    send_to_general_support()
+```
+
+The threshold above is illustrative, not a TypeSafe recommendation. Validate a threshold against your own examples before allowing it to control a real workflow.
+
+## Know the Limits Before Deployment
+
+The **jev ai sdk** only evaluates the evidence placed in `state`. It does not retrieve external information, and irrelevant context can make a judgment less reliable. Retrieve or select relevant material first, then send the smallest state that still contains the evidence needed by each question.
+
+Jev accepts text represented as a string, JSON object, or array of text values. Images, audio, video, and binary files must be converted into text or structured fields before evaluation.
+
+The currently documented service limits and pricing are:
+
+| Parameter | Documented value |
+| --- | --- |
+| Model | `jev-1.13.0` |
+| Price | $0.042 per million input tokens |
+| Output pricing | Free |
+| Request context | 64,000 tokens |
+| State plus longest question | 32,000 tokens |
+| Token rate limit | 250,000 tokens per second |
+| Request rate limit | 1,200 requests per minute |
+| Input modalities | Text only |
+
+These figures come from TypeSafe's [models and pricing documentation](https://docs.typesafe.ai/models.md). The documentation warns that rate limits may change while capacity is adjusted, so confirm current limits before planning traffic.
+
+Important functional limits include:
+
+- Jev is not a reliable calculator or counter.
+- Date comparison and date arithmetic should remain in code.
+- It does not generate prose, summaries, explanations, or code.
+- It can select the wrong valid answer even though its output stays within the supplied schema.
+- Contradictory instructions and criteria can reduce answer quality.
+- User-controlled state can influence classification, so hostile or manipulative input belongs in the application's threat model.
+- English is the primary training language; TypeSafe recommends testing other languages on the intended workload.
+
+Cloudflare also documents access to `typesafe/jev` through Workers AI. Its [Jev model page](https://developers.cloudflare.com/ai/models/typesafe/jev/index.md) shows the same three question types and a 32,000-token context window for that platform. Follow the limits and billing shown by the provider through which the model is called rather than assuming the direct TypeSafe figures apply everywhere.
+
+The core architectural rule is straightforward: let deterministic code own calculations, safety constraints, and irreversible actions. Use Jev for the narrow judgment between known alternatives, and send uncertain or high-impact cases to a person or a separately controlled workflow.
+
+## Jev AI SDK FAQ
+
+### Does the jev ai sdk generate text?
+
+No. Jev returns typed decisions for Choice, Score, and Noul questions. It is designed for structured evaluation and does not replace a generative chat model when an application needs prose, code, summaries, or open-ended answers.
+
+### Can I ask several questions in one request?
+
+Yes. Questions sharing the same state can be sent together and are evaluated independently in parallel. This is useful for collecting all potentially relevant judgments before application code chooses which answers to use.
+
+### Should I use `jev-latest` or a fixed model version?
+
+`jev-latest` follows the current stable release and is the client default documented by TypeSafe. Pin `jev-1.13.0` when you have evaluated behavior or calibrated thresholds against that version, and review a newer version before changing the pin.
+
+### Can a typed Jev response still be wrong?
+
+Yes. Typed output prevents an answer outside the options or levels defined by the request, but it does not guarantee that the selected valid answer is correct. Evaluate the **jev ai sdk** on representative data, inspect probabilities and confidence, and retain manual review paths for uncertain or consequential decisions.

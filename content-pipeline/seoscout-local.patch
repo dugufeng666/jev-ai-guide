@@ -1,0 +1,113 @@
+diff --git a/seoscout/core/web.py b/seoscout/core/web.py
+index 8c5270b..e94f36c 100644
+--- a/seoscout/core/web.py
++++ b/seoscout/core/web.py
+@@ -68,6 +68,9 @@ class Web:
+             {keyword: [WebItem, ...]}
+         """
+         print(f"\n🔍 Web 搜索: {len(keywords)} 个关键词")
++        if not self.config.SERPER_API_KEY:
++            print("  Skipped Google search: SERPER_API_KEY is not configured.")
++            return {keyword: [] for keyword in keywords}
+         if topic_name:
+             print(f"   主题名过滤: \"{topic_name}\"")
+ 
+@@ -274,4 +277,3 @@ class Web:
+                     await asyncio.sleep(2 ** attempt)  # 指数退避
+ 
+             return (item, "")
+-
+diff --git a/seoscout/core/youtube.py b/seoscout/core/youtube.py
+index 28fffa1..a0523ec 100644
+--- a/seoscout/core/youtube.py
++++ b/seoscout/core/youtube.py
+@@ -464,10 +464,16 @@ class YouTube:
+                     session.proxies.update(proxies)
+                     api = YouTubeTranscriptApi(http_client=session)
+                 else:
+-                    api = YouTubeTranscriptApi()
++                    session = requests.Session()
++                    original_request = session.request
++                    def bounded_request(*args, **kwargs):
++                        kwargs.setdefault('timeout', 30)
++                        return original_request(*args, **kwargs)
++                    session.request = bounded_request
++                    api = YouTubeTranscriptApi(http_client=session)
+ 
+                 # 尝试获取字幕（优先中文，然后英文）
+-                languages = ['zh-Hans', 'zh', 'en']
++                languages = ['en', 'zh-Hans', 'zh']
+                 try:
+                     fetched_transcript = api.fetch(video_id, languages=languages)
+                     return " ".join([snippet.text for snippet in fetched_transcript])
+@@ -494,4 +500,3 @@ class YouTube:
+                     return ""
+ 
+         return ""
+-
+diff --git a/seoscout/generate.py b/seoscout/generate.py
+index 41941c0..22ca1db 100644
+--- a/seoscout/generate.py
++++ b/seoscout/generate.py
+@@ -60,6 +60,8 @@ def validate_markdown(content: str) -> tuple:
+     """Basic Markdown validation. Returns (is_valid, error_msg)."""
+     if not content or not content.strip():
+         return False, "Empty content"
++    if 'INSUFFICIENT_EVIDENCE' in content:
++        return False, "Insufficient source evidence"
+     # Must have some heading or JS export metadata
+     has_structure = (
+         'export const metadata' in content[:200]
+@@ -122,6 +124,14 @@ async def run_generate(
+             for kw in kw_data.get('keywords', []):
+                 keyword_entries.append({'keyword': kw.strip(), 'category': ''})
+ 
++    # Respect an explicitly supplied subset even when full search results exist.
++    with open(keywords_file, 'r', encoding='utf-8') as f:
++        requested = json.load(f)
++    allowed = set(requested.get('keywords', []))
++    for group in requested.get('categories', []):
++        allowed.update(group.get('keywords', []))
++    keyword_entries = [entry for entry in keyword_entries if entry['keyword'] in allowed]
++
+     if not keyword_entries:
+         print("  ❌ No keywords found")
+         return
+@@ -180,7 +190,7 @@ async def run_generate(
+             category=cat_slug_final,
+         )
+ 
+-        prompts.append((prompt, {'keyword': keyword, 'slug': slug, 'output_path': output_path}))
++        prompts.append((prompt, {'keyword': keyword, 'slug': slug, 'output_path': output_path, 'source_prompt': prompt}))
+ 
+     if skipped_no_data > 0:
+         print(f"  ⏭️  Skipped {skipped_no_data} keywords (no collected data)")
+@@ -210,6 +220,10 @@ async def run_generate(
+             continue
+ 
+         cleaned = clean_llm_output(content)
++        if 'INSUFFICIENT_EVIDENCE' in cleaned:
++            failed += 1
++            print(f"  ⏸ {meta['slug']}: insufficient evidence; not repaired into an article")
++            continue
+         is_valid, err = validate_markdown(cleaned)
+ 
+         if is_valid:
+@@ -229,7 +243,7 @@ async def run_generate(
+         print(f"\n  🔧 Repairing {len(repair_prompts)} articles...")
+         repair_results = await client.generate_batch(
+             repair_prompts,
+-            batch_size=min(10, len(repair_prompts)),
++            batch_size=min(Config.GENERATE_BATCH_SIZE, len(repair_prompts)),
+         )
+ 
+         for meta, content in repair_results:
+@@ -264,6 +278,7 @@ def _build_repair_prompt(template: str, meta: dict, content: str, error: str) ->
+     """Build a repair prompt asking LLM to fix the invalid output."""
+     keyword = meta.get('keyword', 'unknown')
+     return (
++        meta.get('source_prompt', '') + '\n\n'
+         f"The previous article draft for keyword \"{keyword}\" had issues:\n"
+         f"  Error: {error}\n\n"
+         f"Previous draft (for reference, do NOT repeat the same mistakes):\n"
+

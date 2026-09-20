@@ -1,0 +1,172 @@
+export const metadata = {
+  "title": "Jev AI Structured Output: A Practical Developer Tutorial",
+  "description": "Learn how Jev AI structured output uses Choice, Score, and Noul for code-ready decisions, with practical request design, limits, and routing patterns.",
+  "category": "model",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What Jev AI Structured Output Does
+
+Jev AI structured output converts natural-language state into bounded answers that application code can use without extracting values from generated prose. A Jev AI structured output request pairs that state with typed questions for choosing an option, scoring a defined scale, or estimating whether a statement is true. It is designed for focused decisions, not explanations, creative writing, or other open-ended generation.
+
+TypeSafe describes Jev as a System One model built for quick, structured judgments. Each request supplies a `state` containing the evidence and one or more questions describing the decisions to make. Jev returns typed values and probability distributions that software can compare, sort, threshold, or route directly, according to the official [TypeSafe introduction](https://docs.typesafe.ai/introduction.md).
+
+This design differs from asking a generative model to create JSON. A conventional language model still generates that JSON token by token. Jev is specifically designed around structured decisions rather than human-readable responses.
+
+| Approach | Input | Output | Appropriate work |
+| --- | --- | --- | --- |
+| Jev structured decisions | State plus typed questions | Choices, scores, or probabilities | Classification, routing, ranking, and policy judgments |
+| Generative chat model | Instructions and context | Newly generated text | Writing, summarization, explanations, and open-ended answers |
+| Ordinary application code | Explicit data and rules | Deterministic values | Arithmetic, counting, date comparison, and fixed business rules |
+
+Jev does not replace a generative model when an application must draft text. A practical system can use Jev to decide what should happen and a separate generative model, template, or human workflow to produce any required language.
+
+## Understand Choice, Score, and Noul
+
+The Jev AI structured output interface is organized around three question types. Select the primitive according to the value your application needs, rather than asking a broad prompt and deciding afterward how to interpret the response.
+
+| Primitive | Question it represents | Returned information | Example |
+| --- | --- | --- | --- |
+| Choice | Which known option fits best? | Selected choice, option probabilities, and confidence | Route a ticket to billing, technical support, or sales |
+| Score | Where does the state fall on an ordered rubric? | Score, level legend, level probabilities, and confidence | Rate customer frustration across defined levels |
+| Noul | How likely is a statement to be true? | A value from 0 to 1 | Estimate whether a customer requests a refund |
+
+The official [TypeSafe primitives documentation](https://docs.typesafe.ai/primitives.md) says Choice answers remain within the options supplied by the developer. Include an `other` or `none` option when the listed categories may not cover every case.
+
+Score is appropriate when meaningful levels can be described in order. For example, frustration could range from calm, to concerned, to openly angry. The returned score can fall between levels, but the Jev 1.13 documentation warns against treating that interpolation as an exact numeric measurement.
+
+Noul is intended for a yes-or-no proposition when its probability is useful. A Noul value near 1 supports “yes,” a value near 0 supports “no,” and a value near 0.5 indicates uncertainty. It does not have the separate `confidence` field returned by Choice and Score.
+
+Do not use a Noul probability as a substitute for a scale. “Has this candidate used Python professionally?” can be a Noul question. “How skilled is this candidate in Python?” needs a Score with clearly described proficiency levels.
+
+## Build a Jev Structured Output Request
+
+A reliable Jev AI structured output workflow begins with a narrow decision. Give the model only the evidence needed for that decision, define complete questions, and retain calculations and final policy rules in code.
+
+Follow these steps:
+
+1. Identify the application decision, such as routing a ticket or escalating a review.
+2. Build a `state` containing the relevant text or structured fields.
+3. Divide the decision into independent, atomic judgments.
+4. Select Choice, Score, or Noul for each judgment.
+5. Write explicit instructions and criteria, including important boundary cases.
+6. Send questions sharing the same state in one request.
+7. Apply thresholds, weights, and deterministic rules in application code.
+8. Log the versioned model ID and evaluate results against labeled examples.
+
+The request components have separate responsibilities:
+
+| Component | Purpose | Design guidance |
+| --- | --- | --- |
+| `model` | Selects the Jev version or alias | Pin a version when thresholds depend on model behavior |
+| `state` | Holds the evidence being evaluated | Remove unrelated material and name fields clearly |
+| Question ID | Maps an answer back to application code | Use a stable, descriptive identifier |
+| `type` | Selects Choice, Score, or Noul | Match it to the value the code consumes |
+| `instructions` | States the judgment | Make the full condition explicit |
+| `criteria` | Defines options or rubric levels | Align criteria with the instructions |
+
+The SDK example below follows the request pattern documented by TypeSafe. It asks three independent questions about one state in a single call:
+
+```python
+from typesafe_sdk import Choice, Noul, Score, TypeSafeClient
+
+state = dict(
+    ticket_message=(
+        "Our integration returns 500 errors on every request, "
+        "and customer orders cannot be processed."
+    )
+)
+
+questions = dict(
+    department=Choice(
+        instructions="Which team should handle `ticket_message`?",
+        criteria=dict(
+            billing="Payment or subscription issue.",
+            technical="Bug or integration problem.",
+            sales="Pricing or account question.",
+        ),
+    ),
+    urgent=Noul(
+        instructions="Does `ticket_message` describe an urgent service impact?"
+    ),
+    frustration=Score(
+        instructions="How frustrated is the customer in `ticket_message`?",
+        criteria=[
+            "Calm and neutral.",
+            "Concerned but civil.",
+            "Very angry or using strong language.",
+        ],
+    ),
+)
+
+with TypeSafeClient() as client:
+    response = client.system_one(state=state, questions=questions)
+
+print(response.answers["department"].choice)
+print(response.answers["urgent"].noul)
+print(response.answers["frustration"].score)
+```
+
+Question IDs help the code locate answers, but the documentation says those IDs are not sent to the model. Instructions must therefore express the complete judgment instead of relying on an ID such as `urgent` to provide meaning.
+
+When the state is structured, refer to relevant fields explicitly. An instruction such as “Does `ticket.messages[0].text` request a refund?” is clearer than “Was a refund requested?” because it identifies the evidence the model should judge.
+
+## Compose Decisions in Application Code
+
+Jev evaluates questions in the same request independently against the same state. One answer does not become hidden context for another. TypeSafe recommends sending multiple questions together when they can all be evaluated from the original state, because the model evaluates them in parallel.
+
+This supports speculative fan-out: ask every judgment that might be needed, then let code ignore irrelevant answers. A support workflow could classify the department, estimate urgency, and score frustration in one request even if the frustration score is used only for technical incidents.
+
+Complex decisions should be decomposed instead of hidden inside one instruction. For example, do not ask Jev to “calculate ticket priority” from several competing factors. Ask separately about operational impact, customer frustration, and report quality, then combine those values with an explicit formula.
+
+| Judgment | Model responsibility | Code responsibility |
+| --- | --- | --- |
+| Ticket category | Select the best defined category | Route to the associated queue |
+| Urgency | Estimate whether the message indicates urgency | Apply the organization’s escalation threshold |
+| Customer frustration | Score defined language levels | Add the approved priority weight |
+| Policy eligibility | Judge whether text matches stated criteria | Enforce limits and execute the approved action |
+
+A second request is justified only when a later question truly depends on an earlier result. Examples from the documentation include using an initial classification to fetch new evidence or determine the options for a follow-up question. Otherwise, keep the questions together and compose their answers in code.
+
+Thresholds require evaluation on representative data. A probability is useful input, not a guarantee of correctness. Add a review path for uncertain or high-impact cases, and do not assume thresholds tuned for Noul will transfer to Choice probabilities.
+
+## Account for Jev 1.13 Limits
+
+The current supplied model documentation lists `jev-1.13.0` as the version behind `jev-latest`. The alias can move after a release, while a versioned ID remains pinned. The response reports the version that handled the request, allowing applications to record it.
+
+According to the official [models page](https://docs.typesafe.ai/models.md), Jev 1.13 accepts text represented as a string, JSON object, or array of text values. It does not directly accept image, audio, video, or binary input. Its request budget is 64,000 tokens overall, with a separate 32,000-token limit covering the state plus the longest question.
+
+More context is not necessarily better. The official [Jev 1.13 limitations guide](https://docs.typesafe.ai/model-jaggedness/jev-1.13.md) says irrelevant material can reduce accuracy and make errors harder to diagnose.
+
+| Limitation | Practical response |
+| --- | --- |
+| Literal interpretation | State exact conditions, scope, and boundary cases |
+| Unreliable counting and arithmetic | Calculate with code |
+| Weak date and time comparison | Extract components, then compare real dates in code |
+| Difficulty with indirection | Reduce reasoning hops and identify relevant state fields |
+| Distraction from large state | Retrieve and filter evidence before sending it |
+| Sensitivity to adversarial content | Use precise criteria and test hostile or misleading inputs |
+| No open-ended generation | Use a generative model when new text is required |
+
+Jev also does not guarantee arithmetic relationships across separately worded questions. A Noul question and a yes-or-no Choice about the same topic may produce different-looking probabilities because they are different evaluations. Likewise, asking a statement and its negation does not guarantee that the two Noul values sum to 1.
+
+These constraints define where Jev AI structured output is useful: bounded semantic judgment with explicit options. Deterministic operations should remain deterministic, while open-ended writing should remain with a model designed to generate text.
+
+## Jev AI Structured Output FAQ
+
+### Is Jev AI structured output the same as JSON mode?
+
+No. JSON mode generally constrains a generative model to produce valid JSON while it continues generating tokens. Jev is designed around typed, bounded decisions and directly returns Choice, Score, or Noul answers rather than open-ended content wrapped in JSON.
+
+### Can Jev generate a customer response after classifying a ticket?
+
+Jev 1.13 is not trained for text generation. Use its structured answer to select a workflow, template, or separate generative model. This keeps the routing decision distinct from the writing task.
+
+### Should every judgment use a separate API request?
+
+No. Questions that use the same state should normally be sent together. They are evaluated independently and in parallel. Use another request only when the first answer is required to obtain new state or construct the next question.
+
+### Can a Jev probability trigger an automatic action?
+
+It can be used as an application input, but the threshold belongs to your code and should be evaluated for the specific workload. Include human review or another fallback for uncertain, sensitive, or high-impact decisions.

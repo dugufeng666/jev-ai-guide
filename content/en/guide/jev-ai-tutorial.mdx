@@ -1,0 +1,200 @@
+export const metadata = {
+  "title": "Jev AI Tutorial: Build Reliable Typed Decisions in Python",
+  "description": "Follow this Jev AI tutorial to classify state with Choice, Score, and Noul in Python, batch focused questions, handle confidence, and avoid known limits.",
+  "category": "guide",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## Start a Jev Decision Workflow
+
+This Jev AI tutorial shows how to give Jev a state, ask focused typed questions, and use the resulting probabilities in Python application logic. By following this Jev AI tutorial, you will build a support-ticket classifier with Choice, Score, and Noul while keeping arithmetic and policy decisions in code. Jev is intended for structured judgments, not chatbot responses or open-ended writing.
+
+TypeSafe describes Jev as its flagship System One model. Instead of generating prose, it evaluates questions against supplied state and returns structured results that an application can branch on, sort, or use for routing. The [TypeSafe introduction](https://docs.typesafe.ai/introduction.md) explains this distinction.
+
+That makes Jev complementary to a generative model rather than a replacement for one.
+
+| Requirement | Jev's intended role | Generative model's role |
+| --- | --- | --- |
+| Classify an item | Return a typed choice and probabilities | Possible, but usually through generated output |
+| Evaluate a yes-or-no condition | Return a Noul probability | Explain or discuss the condition |
+| Rate an ordered quality | Return a score over defined levels | Produce an open-ended assessment |
+| Write a customer response | Not an intended capability | Generate the response |
+| Perform exact calculations | Leave the work to code | Also better handled by code |
+
+The practical lesson is to separate judgment from generation. Jev can decide whether a ticket appears urgent or which team should receive it. A generative model can then draft a reply when writing is required.
+
+## Understand Jev's Three Question Types
+
+A Jev request contains a **state** and one or more **questions**. State is the information being evaluated, such as a message, conversation, record, or JSON object. Each question asks for one specific judgment about that state.
+
+The official [TypeSafe primitives guide](https://docs.typesafe.ai/primitives.md) defines three question types:
+
+| Primitive | Use it when you need | Returned information |
+| --- | --- | --- |
+| Choice | One answer from a fixed set of options | Selected choice, option probabilities, and confidence |
+| Score | A position along ordered, described levels | Score, level legend, probabilities, and confidence |
+| Noul | The probability that a statement is true | A value from 0 to 1 |
+
+### Choice
+
+Use Choice when your application must select among named alternatives. A support workflow could choose `billing`, `technical`, or `account`. The options should cover the expected cases; TypeSafe recommends adding an `other` or `none` option when the list may be incomplete.
+
+### Score
+
+Use Score for an ordered spectrum. Appropriate examples include calm-to-angry customer sentiment or low-to-high issue severity. Each level needs a concrete description so the model is evaluating a defined rubric rather than interpreting a vague label.
+
+A Score can fall between the supplied levels. It is useful for thresholding and ranking, but TypeSafe warns against treating it as an exact measurement or reconstructing a precise number through interpolation.
+
+### Noul
+
+Use Noul for a direct yes-or-no judgment when the probability of “yes” is itself useful. A value near 1 favors yes, a value near 0 favors no, and a value near 0.5 indicates uncertainty.
+
+Noul is not a substitute for a scale. For example, “Does the resume state that the applicant used Python at work?” is a bounded Noul question. “How skilled is the applicant in Python?” requires a Score with defined experience levels.
+
+## Build the Classifier in Python
+
+This section of the Jev AI tutorial uses the official Python SDK pattern shown in TypeSafe's primitives documentation. It assumes that `typesafe_sdk` is installed and that the client has been configured with the credentials required by your environment.
+
+The example evaluates one support message in three ways:
+
+1. Select the responsible team.
+2. estimate the customer's frustration;
+3. determine whether immediate attention is requested.
+
+```python
+from typesafe_sdk import Choice, Noul, Score, TypeSafeClient
+
+state = {
+    "ticket_message": (
+        "Our checkout integration has returned errors since this morning. "
+        "Customers cannot complete orders, and we need help now."
+    )
+}
+
+questions = {
+    "department": Choice(
+        instructions=(
+            "Which department should handle the issue in `ticket_message`?"
+        ),
+        criteria={
+            "billing": "Charges, invoices, refunds, or subscriptions.",
+            "technical": "Software errors, outages, or integration failures.",
+            "account": "Login, access, or account-management problems.",
+            "other": "The issue does not fit the other departments.",
+        },
+    ),
+    "frustration": Score(
+        instructions=(
+            "How frustrated does the customer appear in `ticket_message`?"
+        ),
+        criteria=[
+            "Calm and neutral.",
+            "Concerned but civil.",
+            "Very angry or using strong language.",
+        ],
+    ),
+    "urgent": Noul(
+        instructions=(
+            "Does `ticket_message` explicitly convey a need for "
+            "immediate attention?"
+        ),
+    ),
+}
+
+with TypeSafeClient() as client:
+    response = client.system_one(
+        state=state,
+        questions=questions,
+    )
+
+department = response.answers["department"]
+frustration = response.answers["frustration"]
+urgent = response.answers["urgent"]
+
+print(department.choice)
+print(department.probabilities)
+print(department.confidence)
+print(frustration.score)
+print(frustration.confidence)
+print(urgent.noul)
+```
+
+The SDK classes, `system_one` call, and answer access pattern above follow the documented TypeSafe Python interface. The ticket and criteria are tutorial examples rather than claimed production results.
+
+Notice that all three questions share one state. TypeSafe says questions in the same request are evaluated independently and in parallel. A question's answer does not become hidden context for another question, so batching works when each judgment can be made from the original state.
+
+### Turn Answers Into Policy
+
+Jev supplies model outputs; your application remains responsible for deciding what to do with them. For example, a team might automatically route a ticket only when Choice confidence passes a threshold established through its own evaluation process. Uncertain cases could go to a human queue.
+
+Do not copy an arbitrary threshold into production. TypeSafe's documentation treats thresholds and escalation policies as application decisions. Validate them against representative inputs, false-positive costs, and false-negative costs before automating an action.
+
+This separation is central to a reliable Jev AI tutorial workflow:
+
+| Layer | Responsibility |
+| --- | --- |
+| Jev question | Make one defined judgment about the state |
+| Jev answer | Return a typed result and available probability information |
+| Application code | Apply thresholds, weights, business rules, and arithmetic |
+| Human review | Resolve cases your policy chooses not to automate |
+
+## Design Questions and Handle Known Limits
+
+Good results depend on asking atomic questions. TypeSafe recommends questions that a knowledgeable person could answer quickly from the supplied evidence. If a judgment combines several factors, split it into separate questions and combine their answers in code.
+
+Instead of asking Jev to “determine the priority,” ask separately about operational impact, expressed urgency, and customer frustration. Your program can then assign weights or rules. This keeps business policy visible and editable without hiding it inside a broad instruction.
+
+Question IDs are only identifiers for application code and are not sent to the model, according to the primitives documentation. Write complete instructions even when an ID such as `urgent` appears self-explanatory. For structured state, name relevant paths such as `ticket_message` directly in the instruction.
+
+The official [Jev 1.13 limitations page](https://docs.typesafe.ai/model-jaggedness/jev-1.13.md) documents several important failure modes:
+
+| Documented limitation | Practical response |
+| --- | --- |
+| Literal interpretation | State the exact condition and define boundary cases |
+| Unreliable counting and arithmetic | Count and calculate in ordinary code |
+| Weak date comparison | Extract components, then compare real dates in code |
+| Difficulty with indirection | Reduce reasoning hops and identify relevant state fields |
+| Distraction from irrelevant context | Filter state before sending it |
+| Sensitivity to adversarial content | Use precise criteria and test hostile inputs |
+| No intended text generation | Use a generative model when prose is required |
+
+Jev 1.13 also does not guarantee arithmetic relationships between independently phrased questions. The probability for “Is this a refund request?” should not be assumed to equal one minus the probability for “Is this something other than a refund request?” Ask the decision one way and enforce any required identity in code.
+
+Similarly, do not assume a yes-or-no Choice and a Noul are interchangeable. A Choice compares supplied options relative to one another, while a Noul evaluates the probability of a single statement. Thresholds tuned for one primitive should not automatically be transferred to another.
+
+### Keep the State Focused
+
+More context is not always better. The Jev 1.13 guidance says unrelated material can reduce accuracy by distracting from the relevant evidence. Send only the fields needed for the questions in that request.
+
+When several questions genuinely use the same evidence, batch them. TypeSafe calls a broader version of this approach speculative fan-out: ask the independent questions your code may need, then ignore answers that are irrelevant to the path ultimately taken.
+
+Use a second request only when a later question truly depends on an earlier answer, such as when the first result determines which records to retrieve or which options the next Choice should contain.
+
+## Apply the Jev AI Tutorial Pattern Safely
+
+A useful deployment process starts with examples rather than automation. Collect representative states, write narrow questions, and compare outputs with the decisions your application is expected to make. Include ambiguous, contradictory, irrelevant, and adversarial inputs in that review.
+
+Then decide how uncertainty changes behavior. Low-confidence results can be held for review, while clearer cases can follow deterministic routing rules. Monitor each primitive separately because its output has a different meaning.
+
+LangChain also exposes Jev through `TypeSafeClassifier`, according to its [guide to building a harness with Jev](https://www.langchain.com/blog/building-a-harness-with-jev). The integration can use text, structured data, or LangChain messages as state. LangChain presents model routing and pre-execution tool checks as example uses, but those patterns still require application-specific criteria, testing, and safeguards.
+
+Do not treat a classifier as a complete security boundary. TypeSafe explicitly notes that adversarial text can influence Jev 1.13. High-impact tool calls need conventional authorization, input validation, limited permissions, logging, and human approval where appropriate.
+
+## Jev AI Tutorial FAQ
+
+### What is Jev AI used for?
+
+Jev is designed for fast, structured judgments that software can consume directly. Typical shapes include selecting from known options, scoring against ordered criteria, and estimating whether a statement is true. It is not designed to write articles, explanations, or customer messages.
+
+### Does Jev replace a large language model?
+
+No. Jev handles structured decisions, while generative language models handle writing and open-ended generation. An application can use both: Jev for routing or classification and a generative model for producing text.
+
+### Can several Jev questions be sent together?
+
+Yes. Questions that use the same state can be included in one request and may mix Choice, Score, and Noul. They are evaluated independently, so one answer does not automatically inform another.
+
+### What is the most important lesson from this Jev AI tutorial?
+
+Keep each question focused, define options precisely, and leave deterministic work to code. Arithmetic, counting, date comparison, authorization, thresholds, and business rules should remain explicit application logic rather than being delegated to Jev.

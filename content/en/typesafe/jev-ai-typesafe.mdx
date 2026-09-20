@@ -1,0 +1,130 @@
+export const metadata = {
+  "title": "Jev AI TypeSafe: Tutorial for Structured Decisions",
+  "description": "Learn how jev ai typesafe turns text state and typed questions into structured decisions, then design practical scoring, routing, and review workflows.",
+  "category": "typesafe",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What Jev AI TypeSafe Means
+
+The phrase **jev ai typesafe** describes using Jev to turn text-based state and predefined questions into structured decisions that application code can consume directly. A **jev ai typesafe** workflow is useful for classification, scoring, routing, extraction, and controlled branching, not open-ended writing. This independent tutorial explains the documented model without implying official endorsement, hands-on test results, or guaranteed production performance.
+
+TypeSafe calls Jev its flagship model and the first System One model. Instead of generating a free-form answer, Jev evaluates typed questions against supplied state and returns structured values, probabilities, and confidence information, as described in the [TypeSafe introduction](https://docs.typesafe.ai/introduction.md).
+
+That design addresses a specific software problem: generative language models produce strings, but programs usually need predictable values. Parsing a generated response can fail when its format changes. Jev limits the possible output structure in advance, although that structural guarantee does not mean every judgment will be semantically correct.
+
+| Requirement | Jev's documented approach | Practical effect |
+| --- | --- | --- |
+| Input | Natural-language text represented as a string, JSON object, or array of text values | Existing textual records can be supplied as state |
+| Question | A typed Choice, Score, or Noul primitive | The expected answer form is defined before evaluation |
+| Output | Structured values with probabilities or confidence data | Code can route, rank, or branch without parsing prose |
+| Multiple judgments | Questions are evaluated independently and in parallel | One state can support several separate decisions |
+| Open-ended writing | Jev does not generate arbitrary strings | A generative model remains necessary for drafting or conversation |
+
+Jev therefore does not replace a chat model. It serves a narrower role: making fast, constrained judgments inside software workflows.
+
+## How Jev Evaluates Typed Questions
+
+A Jev request has two central concepts: state and questions. State contains the textual evidence the model should examine. Questions define the individual judgments it should make about that evidence.
+
+The official documentation identifies three question primitives. They can be mixed in one request, and each is evaluated independently against the same state.
+
+| Primitive | Use it to ask | Documented result |
+| --- | --- | --- |
+| Choice | Which predefined option best matches the state? | Selected choice, option probabilities, and confidence |
+| Score | Where does the state fall on a defined rubric? | Score, score probabilities, and confidence |
+| Noul | How likely is a statement to be true? | A value from 0 to 1 |
+
+These definitions come from the [official TypeSafe introduction](https://docs.typesafe.ai/introduction.md). The documentation does not provide enough detail in the supplied sources to reproduce complete request schemas, so this article does not invent API parameters or executable examples.
+
+The important design principle is atomicity. A question should ask for one focused determination that a knowledgeable person could make quickly from the available context. If a question combines several independent considerations, split it into smaller questions and combine their outputs in ordinary code.
+
+For example, “Should this support ticket be escalated?” may hide several factors: urgency, account impact, security relevance, and whether the issue blocks a critical workflow. A stronger **jev ai typesafe** design evaluates those factors separately. Your application can then apply explicit escalation rules instead of asking the model to perform an opaque, multi-factor decision.
+
+This decomposition also separates model judgment from business policy. Jev can estimate whether the message appears urgent, while application code decides how urgency interacts with account tier or staffing rules.
+
+## Build a Structured Decision Workflow
+
+Start with a decision that has bounded outcomes. Good candidates include assigning a category, scoring a record against a rubric, estimating whether a statement is true, or choosing a route from an approved list. Tasks requiring original prose, extended deliberation, or an unrestricted answer are not a natural fit.
+
+Use the following process to design a **jev ai typesafe** workflow without relying on undocumented request details.
+
+| Step | Action | Example outcome |
+| --- | --- | --- |
+| 1 | Define the software decision | Route a ticket to billing, technical support, security, or general support |
+| 2 | Assemble relevant textual state | Ticket body, product name, plan details, and recent support context |
+| 3 | Split broad judgment into atomic questions | Determine topic, urgency, and security relevance independently |
+| 4 | Select the appropriate primitive | Choice for destination, Score for urgency, Noul for a security statement |
+| 5 | Encode domain criteria | Describe category boundaries and important edge cases |
+| 6 | Combine results in code | Route high-confidence cases and send uncertain cases to review |
+| 7 | Monitor outcomes | Compare decisions with reviewed examples and adjust workflow rules |
+
+The state should contain evidence relevant to the questions, not every piece of information available to the application. TypeSafe documents a 32,000-token allowance for the state plus the longest question and a 64,000-token total request budget for Jev 1.13. Longer context is therefore possible, but relevance and evaluation quality still require testing.
+
+Write criteria that distinguish neighboring outcomes. A routing question should explain how billing problems differ from technical failures and what to do with mixed cases. The [model documentation](https://docs.typesafe.ai/models.md) says domain rules and boundary cases can be expressed through each question's instructions and criteria.
+
+Next, decide what uncertainty means operationally. A structured answer can still be uncertain or wrong. Use probabilities and confidence information to define separate paths for automatic handling, secondary checks, and human review. Thresholds should be derived from your own evaluated workload rather than copied from an unrelated example.
+
+Finally, keep independent factors separate in code. If urgency should count twice as much as customer impact, express that policy in a formula or branching rule. This makes the policy inspectable and allows it to change without rewriting a broad prompt.
+
+## Model Selection, Cost, and Operations
+
+The supplied model page lists Jev 1.13 under the versioned identifier `jev-1.13.0`. It also documents `jev-latest` and `jev-preview` aliases, both pointing to that version at the time the source was collected.
+
+Use an alias when automatic movement to a newer release is acceptable. Pin the versioned identifier when behavior must remain stable while confidence thresholds or routing policies are evaluated. The response reports the version that handled the request, so applications can record that value for later analysis.
+
+| Parameter | Documented value for Jev 1.13 | Operational note |
+| --- | --- | --- |
+| Model ID | `jev-1.13.0` | Pin this identifier for controlled upgrades |
+| Stable alias | `jev-latest` | SDK examples use this alias by default |
+| Input price | $42 per billion tokens or $0.042 per million tokens | Pricing is based on input tokens |
+| Output price | Free | The documentation says output is too inexpensive to meter |
+| Rate limits | 250,000 tokens per second and 1,200 requests per minute | Limits may change dynamically |
+| Context | 64,000 tokens per request; 32,000 for state plus the longest question | All questions share the overall request budget |
+| Input formats | Text in a string, JSON object, or array of text values | Images, audio, video, and binaries require preprocessing |
+
+These figures are reported on the [TypeSafe models and pricing page](https://docs.typesafe.ai/models.md). They are source-backed specifications, not measurements performed by Jev AI Guides.
+
+The model page says requests exceeding either rate limit receive `429 Too Many Requests`. TypeSafe's client SDKs reportedly retry with backoff and honor a `retry-after` header when present. Direct HTTP clients need equivalent rate-limit handling.
+
+For production planning, treat the published limits as current documentation rather than permanent guarantees. TypeSafe explicitly warns that limits are changing with demand and capacity. Pricing, aliases, and model availability should likewise be checked against current documentation before deployment.
+
+## Capabilities, Claims, and Limits
+
+TypeSafe's launch article describes Jev as optimized for structured decisions and parallel output rather than sequential token generation. The company reports end-to-end response times of 70 to 500 milliseconds and claims major speed and cost advantages on its workflow evaluations. Those are TypeSafe's published results, not independently verified findings from this guide.
+
+The [TypeSafe launch article](https://typesafe.ai/blog/introducing-system-one-models-and-jev) also provides important caveats. Its workflow reference answers were based on outputs from large external models rather than objective ground truth. The workflows were created by members of TypeSafe's model capabilities team, which the company acknowledges could introduce bias.
+
+TypeSafe says schema matching is guaranteed and describes type errors as impossible. Interpret that claim precisely: Jev is designed not to emit an answer outside the defined structure. It can still select an incorrect option, assign an unsuitable score, or receive incomplete state. Type safety controls output shape; it does not prove factual or business correctness.
+
+A responsible **jev ai typesafe** implementation should account for these documented boundaries:
+
+- Jev accepts text only. Images, audio, video, and binary files must first be transformed into text or structured textual fields.
+- English is the primary training language and currently has the strongest documented accuracy.
+- Other languages are supported unevenly and require workload-specific evaluation.
+- Broad questions should be decomposed into atomic judgments.
+- Confidence should influence routing rather than being treated as a correctness guarantee.
+- Model aliases can move to newer versions and change behavior.
+- Rate limits are explicitly described as dynamic.
+- Jev is not designed for open-ended text generation.
+
+The model documentation also states that customer requests and responses are not used to train Jev. It notes that zero data retention is available for enterprise customers, but the supplied evidence does not establish that policy for every account. Review the linked legal terms before sending sensitive information.
+
+## FAQ
+
+### Is jev ai typesafe a generative chatbot?
+
+No. **Jev AI TypeSafe** is designed for typed, structured decisions based on textual state. It does not replace generative chat models for writing, conversation, summaries, or other open-ended text generation.
+
+### What kinds of tasks fit Jev?
+
+Documented use cases include classification, routing, scoring, extraction, verification, and software branching. The best candidates have predefined outcomes and can be broken into focused questions.
+
+### Does a typed response guarantee the decision is correct?
+
+No. TypeSafe claims that Jev's response will match the requested schema, which prevents output-format errors. Semantic accuracy still depends on the state, question design, model behavior, and application thresholds.
+
+### Should an application use `jev-latest` or a pinned version?
+
+Use `jev-latest` when receiving stable updates automatically is acceptable. Pin `jev-1.13.0` when thresholds and behavior must remain fixed during evaluation, then test a newer model before deliberately upgrading.

@@ -1,0 +1,225 @@
+export const metadata = {
+  "title": "Jev AI Cloudflare Tutorial for Structured Evaluations",
+  "description": "Learn how to use jev ai cloudflare for typed Noul, Choice, and Score evaluations, interpret probabilities and confidence, and build Workers AI workflows.",
+  "category": "integrations",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What Jev AI Cloudflare Does
+
+jev ai cloudflare refers to running TypeSafe's `typesafe/jev` model through Cloudflare AI, either with `env.AI.run` or the documented account API. Use jev ai cloudflare when an application must evaluate text or structured data against typed questions and return machine-readable answers, probabilities, and confidence instead of open-ended prose. Cloudflare identifies Jev as a third-party structured evaluation model with a 32,000-token context window in its [official Jev model reference](https://developers.cloudflare.com/ai/models/typesafe/jev/).
+
+A Jev request contains a `state` and one or more `questions`. The state can be plain text, such as a customer message, or a structured object containing records, events, and policies. Each question specifies the form of answer the application needs.
+
+This makes the model relevant to workflows such as:
+
+- Classifying a support request into a defined department.
+- Estimating urgency or whether a condition is true.
+- Scoring risk against an ordered set of criteria.
+- Reviewing a structured request against a supplied policy.
+- Returning multiple related evaluations in one response.
+
+Jev is designed for structured decisions. It does not replace generative chat models used for writing, conversation, summarization, or other open-ended text generation.
+
+## Understand the Three Question Types
+
+The Jev model page documents three typed question formats: Noul, Choice, and Score. Selecting the correct type is the central design decision in a jev ai cloudflare integration.
+
+| Question type | Supported input pattern | Documented output | Suitable use |
+|---|---|---|---|
+| `noul` | An instruction, optionally with `true` and `false` criteria | A numeric `noul` value | Evaluating a binary-style condition such as urgency or escalation |
+| `choice` | Named options with a description for each option | Selected `choice`, `confidence`, and option `probabilities` | Routing or classification into a fixed set |
+| `score` | An ordered array of criteria | Numeric `score`, `confidence`, `legend`, and probabilities | Rating severity, frustration, or risk on an ordered scale |
+
+These formats and response fields appear in the [Cloudflare Jev documentation](https://developers.cloudflare.com/ai/models/typesafe/jev/index.md).
+
+### Use Noul for a two-sided evaluation
+
+A Noul question asks whether the state supports a condition. Cloudflare's example checks whether a support message conveys urgency and supplies descriptions for the `true` and `false` cases.
+
+The returned field is numeric. In the documented example, the urgency answer is `0.95`. However, the supplied documentation does not define a universal approval threshold. A production application must decide what values trigger automation, manual review, or no action.
+
+### Use Choice for defined categories
+
+A Choice question provides named categories as keys and explanatory criteria as values. For example, a support router can define `billing`, `technical`, and `sales`, then ask which team should handle a message.
+
+The response includes the selected key as well as probabilities for the available options. This is more useful than parsing a generated sentence because the application receives one of its own predefined labels.
+
+### Use Score for an ordered scale
+
+A Score question supplies an ordered list. Cloudflare's frustration example uses `Calm`, `Frustrated`, and `Very angry`, which become positions `0`, `1`, and `2` in the returned legend.
+
+The documented result includes a numeric score, confidence, a legend, and probabilities for each position. The example returns `1.04`, so consumers should preserve the numeric result rather than assuming every score will be an integer.
+
+## Build a Jev Request on Cloudflare
+
+Before sending a request, identify the state to evaluate and write criteria that make each expected outcome distinct. The official API examples use the model identifier `typesafe/jev`.
+
+| Request element | Requirement shown in the docs | Purpose |
+|---|---|---|
+| Model | `typesafe/jev` | Selects the Jev model |
+| `state` | Required | Supplies the text or structured object to evaluate |
+| `questions` | Required object | Defines one or more named evaluations |
+| Question `type` | `noul`, `choice`, or `score` | Determines the answer structure |
+| `instructions` | Used in documented examples | States what the model should evaluate |
+| `criteria` | Object or ordered array, depending on type | Defines the meaning of possible outcomes |
+
+The following TypeScript request is the primary usage example provided by Cloudflare. It evaluates urgency, department, and frustration in a single call:
+
+```ts
+const response = await env.AI.run(
+  'typesafe/jev',
+  {
+    state: 'Help! My payouts have been failing for 3 days.',
+    questions: {
+      is_urgent: {
+        type: 'noul',
+        instructions: 'Does this convey urgency?',
+        criteria: {
+          true: 'Explicitly time-sensitive',
+          false: 'No urgency expressed',
+        },
+      },
+      department: {
+        type: 'choice',
+        instructions: 'Which team should handle this?',
+        criteria: {
+          billing: 'Payments, invoicing, refunds',
+          technical: 'Bugs, outages, integrations',
+          sales: 'Pricing, upgrades, new accounts',
+        },
+      },
+      frustration: {
+        type: 'score',
+        instructions: 'How frustrated is the customer?',
+        criteria: ['Calm', 'Frustrated', 'Very angry'],
+      },
+    },
+  },
+)
+
+console.log(response)
+```
+
+This jev ai cloudflare request demonstrates an important pattern: evaluate related attributes together, but give each attribute its own question and answer type. Urgency is not forced into the same classification as department, and frustration remains an ordered score rather than a category name.
+
+Cloudflare also documents an HTTP endpoint at:
+
+```text
+https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/ai/run
+```
+
+The documented request uses a bearer token, a JSON content type, and a body containing `model` plus `input`. The input object contains the same `state` and `questions` structure used by `env.AI.run`.
+
+Do not place an API token in browser code or a public repository. The source documents the bearer-token request format, but it does not provide token-scoping or secret-management instructions on the Jev model page. Those operational details should be reviewed against current Cloudflare account documentation before publication or deployment.
+
+## Read the Response and Define Routing Rules
+
+A successful response contains `model`, `answers`, and `usage`. Each key under `answers` corresponds to a question key in the request.
+
+Cloudflare's documented support example returns the following values:
+
+```json
+{
+  "model": "jev-1.13.0",
+  "answers": {
+    "is_urgent": {
+      "type": "noul",
+      "noul": 0.95
+    },
+    "department": {
+      "type": "choice",
+      "choice": "billing",
+      "confidence": 0.8,
+      "probabilities": {
+        "billing": 0.87,
+        "sales": 0,
+        "technical": 0.13
+      }
+    },
+    "frustration": {
+      "type": "score",
+      "score": 1.04,
+      "confidence": 0.94,
+      "legend": {
+        "0": "Calm",
+        "1": "Frustrated",
+        "2": "Very angry"
+      },
+      "probabilities": {
+        "0": 0,
+        "1": 0.96,
+        "2": 0.04
+      }
+    }
+  },
+  "usage": {
+    "input_tokens": 426,
+    "output_tokens": 73
+  }
+}
+```
+
+This is a documented example, not a guaranteed result for every similar request. Model outputs can depend on the supplied state, instructions, and criteria.
+
+| Response field | What the source demonstrates | Application interpretation |
+|---|---|---|
+| `answers` | Contains entries keyed by question name | Read the result using the same stable keys sent in the request |
+| `choice` | Contains the selected Choice key | Map the key to an application route only after validation |
+| `probabilities` | Shows values for the available Choice or Score outcomes | Use the distribution to identify ambiguous evaluations |
+| `confidence` | Accompanies documented Choice and Score answers | Apply a locally defined review policy rather than assuming a universal cutoff |
+| `legend` | Maps Score positions to criteria text | Display or log the meaning of the numeric scale |
+| `usage` | Reports input and output token counts | Record usage if it is relevant to application monitoring |
+
+With jev ai cloudflare, confidence and probabilities provide decision context, but they do not define the business action. An application still needs explicit rules for low-confidence responses, conflicting signals, and cases where the supplied categories do not fit.
+
+For example, support routing might send a high-confidence Choice result to the selected queue while sending ambiguous cases to a general review queue. That routing policy is useful interpretation, not behavior promised by the model documentation.
+
+Keep the model result separate from the final action. This is especially important for refunds, account security, or other consequential decisions where source data may be incomplete and human review may be required.
+
+## Use Cases, Boundaries, and Review Checks
+
+The official examples show support routing, structured refund review, and account-risk evaluation. They demonstrate that the state may include nested objects and arrays, not just a single string.
+
+| Documented example | State supplied | Question types used | Result demonstrated |
+|---|---|---|---|
+| Support routing | Login and password-reset message | Choice | Department selection with probabilities |
+| Refund review | Ticket, order charges, and refund policy | Two Noul questions | Whether a refund was requested and supported by the supplied policy |
+| Account risk | Account age, recent events, and verification status | Score and Noul | Risk score and escalation evaluation |
+| Support triage | Payout failure message | Noul, Choice, and Score | Urgency, department, and frustration in one response |
+
+These examples are available in the [official Cloudflare model page](https://developers.cloudflare.com/ai/models/typesafe/jev/). They show request shapes and sample outputs; they do not establish production accuracy, benchmark performance, or suitability for every policy decision.
+
+For a reliable jev ai cloudflare workflow, review the following points before deployment:
+
+- Make Choice categories mutually understandable and describe each one precisely.
+- Include a fallback category when the real input may fall outside the primary options.
+- Keep Score criteria ordered and consistent.
+- Supply the policy or record needed for an evaluation instead of assuming outside facts.
+- Validate answer types and keys before using them in application logic.
+- Define a manual-review path for uncertain or consequential cases.
+- Test against representative inputs and edge cases from the intended application.
+- Reassess thresholds when questions, criteria, or upstream data change.
+
+The source lists a 32,000-token context window, but it does not publish a Jev-specific rate limit, fixed price, latency guarantee, or accuracy benchmark. Cloudflare directs users to its [dashboard pricing page](https://dash.cloudflare.com/?to=/:account/ai/models/typesafe/jev), while terms and licensing are linked separately in the [TypeSafe legal documentation](https://docs.typesafe.ai/legal.md).
+
+Jev is also labeled as a third-party model. Review the linked terms, current Cloudflare configuration, data-handling requirements, and application risk before sending sensitive records. This draft should receive editorial and technical review before publication.
+
+## FAQ
+
+### What is jev ai cloudflare?
+
+jev ai cloudflare is the use of TypeSafe's `typesafe/jev` structured evaluation model through Cloudflare AI. A request provides a text or structured state plus typed questions, and the response contains structured answers such as a selected category, a score, probabilities, or confidence.
+
+### Can Jev evaluate structured JSON data?
+
+Yes. Cloudflare's refund and account-risk examples pass nested objects and arrays as the state. The documented inputs include ticket data, order charges, policy text, account age, security events, and verification status.
+
+### Does Jev generate open-ended content?
+
+Jev is documented as a structured evaluation model for Noul, Choice, and Score questions. It is designed for defined evaluations and does not replace a generative chat model when the task is to write or return open-ended prose.
+
+### Does Cloudflare define confidence thresholds for automation?
+
+Not on the supplied Jev model page. The examples return confidence and probability values, but they do not specify a universal threshold. Each jev ai cloudflare application should define and review its own routing, fallback, and human-approval rules.

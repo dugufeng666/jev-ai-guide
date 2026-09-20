@@ -1,0 +1,156 @@
+export const metadata = {
+  "title": "Jev AI Pricing Guide: API Costs, Limits, and Budgeting",
+  "description": "Learn Jev AI pricing, calculate input-token costs, understand free output, review API limits, and decide where structured decisions fit your workflow.",
+  "category": "api",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What Does Jev Cost?
+
+Jev AI pricing is $42 per billion input tokens, or $0.042 per million input tokens, with no charge for output tokens. Jev AI pricing applies to a specialized model that returns structured decisions rather than open-ended prose, so it should not be compared with chatbot pricing without considering the different workloads. This guide explains the documented rate, shows how to estimate a bill, and identifies the API limits and surrounding costs that can affect a deployment.
+
+Jev is TypeSafe's flagship System One model. It evaluates text-based state against typed questions and returns constrained answers that application code can use directly. The model is intended for focused judgments such as classifying a support request, estimating whether a statement is true, or scoring risk along defined levels.
+
+This is an independent tutorial, not an official TypeSafe publication. Pricing and service limits can change, so verify the figures in the [TypeSafe models documentation](https://docs.typesafe.ai/models.md) before making a purchasing or production decision.
+
+## Jev AI Pricing and API Limits
+
+The current official documentation lists `jev-1.13.0` at $42 per billion input tokens. That converts to 4.2 cents per million tokens and $0.000042 per thousand tokens.
+
+Output tokens are free under TypeSafe's documented pricing. The response can still report an output-token count, as shown in the [Cloudflare Jev documentation](https://developers.cloudflare.com/ai/models/typesafe/jev/index.md), but TypeSafe does not charge for those output tokens when using its published direct pricing.
+
+| Billing item | Documented TypeSafe rate |
+|---|---:|
+| One billion input tokens | $42 |
+| One million input tokens | $0.042 |
+| One thousand input tokens | $0.000042 |
+| Output tokens | Free |
+
+The free-output policy is practical because Jev does not generate essays, conversations, or long reasoning traces. It returns compact typed values, probability distributions, and confidence information. Input remains billable because the model must process the supplied state, instructions, and criteria.
+
+TypeSafe serves the documented models through `POST /v1/systemone`. The request's `model` field selects the model version or alias. The official client SDKs default to `jev-latest`, which pointed to `jev-1.13.0` when the supplied documentation was retrieved.
+
+| API property | Documented value |
+|---|---|
+| Versioned model ID | `jev-1.13.0` |
+| Stable alias | `jev-latest` |
+| Preview alias | `jev-preview` |
+| Endpoint | `POST /v1/systemone` |
+| Token rate limit | 250,000 tokens per second |
+| Request rate limit | 1,200 requests per minute |
+| Full request budget | 64,000 tokens |
+| State plus longest question | 32,000 tokens |
+| Supported input | Text |
+
+The 64,000-token request budget covers the state and all questions combined. A separate 32,000-token restriction applies to the state plus the single longest question.
+
+Input may be supplied as a text string, a JSON object, or an array of text values. Images, audio, video, and binary files must first be converted into text or structured text fields. That preprocessing can introduce additional infrastructure or model costs that are not part of Jev AI pricing.
+
+TypeSafe also warns that the published rate limits are dynamically adjusted and may change without notice. Higher limits are available through custom and enterprise arrangements, but the supplied documentation does not publish prices for those plans.
+
+Cloudflare lists Jev as `typesafe/jev` for Workers AI. Its model page directs customers to the Cloudflare dashboard for pricing rather than quoting the TypeSafe rate. Do not assume TypeSafe's direct API price automatically applies when accessing the model through another platform.
+
+## Calculate a Jev API Budget
+
+The basic Jev AI pricing calculation uses only billable input tokens:
+
+`Estimated cost = input tokens divided by 1,000,000 multiplied by $0.042`
+
+For example, processing 10 million input tokens would cost approximately $0.42 at the documented rate. One billion input tokens would cost $42.
+
+| Input volume | Estimated TypeSafe cost |
+|---:|---:|
+| 100,000 tokens | $0.0042 |
+| 1 million tokens | $0.042 |
+| 10 million tokens | $0.42 |
+| 100 million tokens | $4.20 |
+| 1 billion tokens | $42 |
+
+These are arithmetic estimates based on the published token rate, not quotes or observed invoices. Taxes, enterprise terms, network services, data storage, preprocessing, monitoring, human review, and other models are outside the calculation.
+
+To estimate a monthly workload, follow four steps:
+
+1. Measure or estimate the average input tokens per request.
+2. Multiply that figure by the expected number of requests.
+3. Include the tokens used by question instructions and criteria, not only the state.
+4. Apply the $0.042-per-million rate and add non-Jev infrastructure separately.
+
+Suppose an application sends 2,000 input tokens per request and handles 1,000 requests per day. That equals 2 million input tokens per day, for an estimated Jev charge of $0.084. Over a 30-day month, the estimated direct model charge would be $2.52.
+
+The example does not guarantee an invoice amount. Real traffic varies, retries can add requests, and tokenization may not match a rough word count. Measure actual token usage in the environment where the application runs.
+
+### Account for the Whole System
+
+Low model charges do not make the complete application free. A production workflow may also need:
+
+- A service that converts documents, speech, or images into text
+- Data retrieval and state construction
+- Validation and deterministic business rules
+- Logging, observability, and storage
+- Human review for uncertain or high-impact cases
+- A generative model when the application must write text
+- Retry handling for rate limits and transient errors
+
+This distinction matters when interpreting Jev AI pricing. Jev can handle structured judgment, but it does not replace a language model when the product needs email drafting, explanations, summaries, or open-ended conversation.
+
+## Match Cost to the Right Workload
+
+Jev supports three question types: Choice, Score, and Noul. Each question evaluates the same supplied state independently, and multiple questions in one request are processed in parallel.
+
+| Primitive | Appropriate question | Returned information |
+|---|---|---|
+| Choice | Which defined option fits? | Selected choice, probabilities, and confidence |
+| Score | Where does the state fall on an ordered scale? | Score, legend, probabilities, and confidence |
+| Noul | What is the probability that this is true? | A value from 0 to 1 |
+
+A Choice question is useful for routing a support ticket among known departments. A Score question can place customer frustration or account risk along a defined scale. A Noul question returns the probability of a yes-or-no statement, such as whether a message requests a refund.
+
+The term is spelled **Noul** in TypeSafe's official documentation. Noul does not return a separate confidence field; the value itself represents the probability of yes. Choice and Score return probability distributions plus a confidence value. See the [official primitives guide](https://docs.typesafe.ai/primitives.md) for the documented response shapes.
+
+### Batch Questions That Share State
+
+When several judgments use the same state, TypeSafe recommends sending them in one request. The state is ingested once, and the questions are evaluated in parallel. You pay for the shared state and the additional question tokens, rather than repeatedly submitting the same state in separate calls.
+
+The official primitives documentation reports that a cookbook example with 13 questions in one call was 11.5 times cheaper and 9.6 times faster than making 13 separate calls. Treat those figures as a result from TypeSafe's documented example, not as a guarantee for every workload.
+
+Batching can improve the practical economics of Jev AI pricing when an application needs several independent judgments. It is not appropriate when a later question genuinely depends on an earlier answer, such as when the first result determines which records to retrieve or which options to offer next.
+
+### Design Complete Criteria
+
+Jev's constrained output prevents it from returning a value outside the options or levels supplied by the developer. That makes response handling predictable, but it also puts responsibility on the question design.
+
+For Choice questions, include an `other` or `none of the above` option when the listed categories may not cover every input. Otherwise, the model must select from the available choices even when none is a good fit.
+
+| Limitation or caveat | Budget or design consequence |
+|---|---|
+| Choice answers stay within supplied options | Add a fallback category when coverage is uncertain |
+| Confidence is not a deployment guarantee | Validate thresholds against representative data |
+| English is the strongest supported language | Test accuracy and routing for other languages |
+| Input is text only | Budget for extraction or transcription when needed |
+| Aliases can move to newer versions | Pin a version when thresholds depend on model behavior |
+| Rate limits can change | Implement backoff and monitor current documentation |
+
+TypeSafe states that English is Jev's primary training language and currently provides its strongest accuracy. Other languages are supported unevenly, so multilingual applications need evaluation on their own content.
+
+Model aliases introduce another operational consideration. `jev-latest` can move when TypeSafe releases a new stable version, potentially changing answers without an application code change. Applications with carefully validated confidence thresholds can pin `jev-1.13.0` and evaluate a newer release before migrating.
+
+Jev AI pricing is most relevant to frequent, structured decisions: classification, routing, threshold-based review, and scoring against predefined levels. Jev is not a replacement for generative chat models used for writing, creative generation, or open-ended reasoning.
+
+## Jev AI Pricing FAQ
+
+### How much does Jev cost per million tokens?
+
+The documented Jev AI pricing rate is $0.042 per million input tokens. The equivalent rate is $42 per billion input tokens. Output tokens are free under TypeSafe's published direct pricing.
+
+### Does free output mean a Jev application is free?
+
+No. Input tokens are billable, and the complete application may require preprocessing, databases, monitoring, human review, or another model for text generation. Access through a third-party platform may also use that platform's own pricing.
+
+### Can Jev replace a general-purpose chatbot?
+
+No. Jev is designed to make structured decisions through Choice, Score, and Noul questions. It does not replace generative models for writing, conversational responses, or other open-ended text tasks.
+
+### What is the best way to reduce Jev API costs?
+
+Keep the state relevant, avoid resending unnecessary text, and batch independent questions that evaluate the same state. Measure real token usage before forecasting at scale, and confirm current prices, context limits, and rate limits in the official documentation.

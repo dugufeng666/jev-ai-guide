@@ -1,0 +1,137 @@
+export const metadata = {
+  "title": "Jev AI RLCD Tutorial: Building Structured Decisions",
+  "description": "Understand Jev AI RLCD, design atomic Choice, Score, and Noul questions, interpret confidence, and plan around documented pricing, context, and limits.",
+  "category": "typesafe",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## What Jev AI RLCD Means
+
+Jev AI RLCD refers to TypeSafe's Jev model and the RLCD training method TypeSafe says it uses to produce calibrated decisions. In practical terms, Jev AI RLCD is designed to evaluate text-based state and answer typed questions with structured values, not write open-ended content. This tutorial explains how to frame those questions, compose the results in code, and account for the model's documented constraints.
+
+The [official TypeSafe introduction](https://docs.typesafe.ai/introduction.md) calls Jev its flagship model and first "System One" model. TypeSafe defines this model category around fast judgments that software can consume directly.
+
+A conventional language-model workflow often asks for a prose or JSON response and then validates or parses it. Jev instead exposes three defined question types. Your application supplies the relevant state, asks one or more bounded questions, and receives outputs intended for branching, sorting, scoring, or routing.
+
+| Aspect | Documented behavior |
+|---|---|
+| Model | Jev, TypeSafe's flagship System One model |
+| Training approach | TypeSafe says Jev is trained with RLCD |
+| Primary purpose | Structured decisions for software |
+| Input | Natural-language text in a string, JSON object, or array of text values |
+| Output approach | Typed results rather than generated prose |
+| Customer customization | State, instructions, and criteria supplied with each request |
+
+The supplied sources do not explain what the RLCD acronym expands to or disclose its algorithm, training data, reward design, or implementation. It is therefore accurate to describe RLCD as TypeSafe's stated training method, but not to present an unsupported technical account of how it works.
+
+## Choose the Right Jev Primitive
+
+The core Jev AI RLCD workflow begins by selecting the primitive that matches the decision your program needs. The [TypeSafe introduction](https://docs.typesafe.ai/introduction.md) documents Choice, Score, and Noul as the three available question types.
+
+| Primitive | Question it represents | Documented result |
+|---|---|---|
+| Choice | Which option should be selected from a list? | Selected choice, probabilities, and confidence |
+| Score | How does the state rate against a rubric? | Score, probabilities, and confidence |
+| Noul | Is a specified statement true? | A value from 0 to 1 |
+
+Use **Choice** when the valid destinations are known in advance. Examples of useful interpretation include assigning an item to a defined category or selecting a route from an approved set. The source supports the selection mechanism, probabilities, and confidence; the exact categories and downstream actions remain your application's responsibility.
+
+Use **Score** when a judgment must follow a stated rubric. A score can become one input to ranking or prioritization, but the documentation recommends separating independent factors instead of hiding them inside one broad rating.
+
+Use **Noul** for a narrowly phrased truth judgment. Its result is a continuous value from zero to one rather than generated justification. The supplied documentation does not define that value as a universal real-world probability, so validate how it behaves on representative data before setting automated thresholds.
+
+Jev can evaluate mixed question types in one request. TypeSafe says those questions run in parallel and independently against the same state, with little additional response time as questions are added. Independence also means one question's output does not become another question's context inside that request.
+
+## Build an Atomic Decision Workflow
+
+A reliable Jev AI RLCD design starts with a concrete software decision, not a broad prompt. Identify exactly what your code will do with each result, then write the smallest question that provides the required signal.
+
+Follow this source-grounded process:
+
+1. **Define the application action.** Decide whether the result will select an option, contribute a score, or test a statement.
+2. **Assemble the state.** Include the records, reference material, and relevant proprietary content needed to judge the case.
+3. **Separate independent factors.** Turn each distinct consideration into its own atomic question.
+4. **Add local criteria.** State domain rules and boundary cases in that question's instructions or criteria.
+5. **Combine outputs in code.** Apply your own coefficients, thresholds, routing rules, and fallback behavior.
+6. **Log the resolved model version.** The response identifies the versioned model that handled the request, which matters when aliases move.
+
+The official documentation illustrates decomposition with startup evaluation. Instead of asking for one overall pitch rating, it recommends asking separately about market size, technical feasibility, and differentiation. Your code can then weight those dimensions according to current business priorities.
+
+| Broad request | Atomic design | Application-owned logic |
+|---|---|---|
+| Rate a startup pitch | Separate scores for market size, feasibility, and differentiation | Weight and combine the scores |
+| Make a multi-factor judgment | One question for each independent factor | Apply thresholds and fallback rules |
+| Select among known outcomes | A Choice question with defined options | Route based on the selected option and confidence |
+| Test a specific proposition | A narrowly scoped Noul question | Decide what value triggers review or action |
+
+The first row is based directly on TypeSafe's documented example. The remaining rows are practical interpretations of the supported primitives, not claims about measured performance in those domains.
+
+This structure makes policy visible in application code. When priorities change, developers can alter a coefficient or threshold without turning a single prompt into an opaque collection of competing objectives.
+
+## Plan for Models, Pricing, and Limits
+
+As of the supplied documentation, Jev 1.13 is available as `jev-1.13.0`. Both `jev-latest` and `jev-preview` currently resolve to that version, although TypeSafe warns that aliases can move when new releases appear.
+
+The [official models and pricing page](https://docs.typesafe.ai/models.md) documents the following operating parameters:
+
+| Parameter | Documented value |
+|---|---|
+| Endpoint | `POST /v1/systemone` |
+| Stable alias | `jev-latest` |
+| Versioned model | `jev-1.13.0` |
+| Price | $42 per billion input tokens or $0.042 per million input tokens |
+| Output-token price | Free |
+| Token rate limit | 250,000 tokens per second |
+| Request rate limit | 1,200 requests per minute |
+| Request context | 64,000 tokens across state and all questions |
+| Per-question constraint | 32,000 tokens for state plus the longest question |
+| Supported modality | Text only |
+
+Pricing is based on input tokens. "Free outputs" does not mean the overall request is free, because the supplied state and questions are billable inputs.
+
+The rate limits are also provisional. TypeSafe states that they may change without notice while service capacity adjusts. Requests exceeding either published limit return HTTP `429 Too Many Requests`; the documented client SDKs retry with backoff by default and respect a `retry-after` header when it is present.
+
+Context accounting has two simultaneous constraints. The full request may contain up to 64,000 tokens across the state and all questions, while the state plus the single longest question must remain within 32,000 tokens. Packing many questions into one request does not remove either limit.
+
+For repeatable behavior, pin `jev-1.13.0` after tuning thresholds against that release. An alias is more convenient for following updates, but TypeSafe notes that answers can change when the alias advances. Logging the version returned with every decision supports later analysis.
+
+## Understand the Fit and Evidence Limits
+
+Jev AI RLCD is designed for bounded judgments whose outputs feed software. It does not replace a generative chat model when the task is to draft an article, explain a topic conversationally, summarize in prose, or create other open-ended text.
+
+| Requirement | Jev fit according to supplied sources |
+|---|---|
+| Choose from predefined options | Supported through Choice |
+| Evaluate against a rubric | Supported through Score |
+| Test a focused statement | Supported through Noul |
+| Ask several independent questions about one state | Supported in one request |
+| Generate open-ended prose | Not supported |
+| Process images, audio, video, or binaries directly | Not supported |
+| Fine-tune account-specific weights | Not offered as described in the model documentation |
+
+Non-text material must be converted into text or structured textual fields before it is sent as state. That preprocessing step can affect the information available to the model, so its quality belongs in any evaluation plan.
+
+English is the primary training language and the language in which TypeSafe says accuracy is currently strongest. Other languages, including CJK scripts, are accepted but are not described as equally reliable. The documentation recommends testing on your own content and monitoring confidence before depending on a non-English workflow.
+
+TypeSafe also says Jev is not fine-tuned or adapted with each customer's data. Domain behavior is shaped through request-time state, instructions, criteria, and question decomposition. The same model weights serve all accounts.
+
+A [community post on X](https://x.com/kimmonismus/status/2100057080698950042) repeats creator claims that Jev can be 20 to 200 times faster and 40 to 400 times cheaper than comparable LLMs. The supplied evidence does not include benchmark methodology, comparison models, workloads, or independently verified results. Treat those figures as reported claims, not established expectations for a production system.
+
+## Jev AI RLCD FAQ
+
+### What does Jev AI RLCD do?
+
+It evaluates supplied text-based state against typed questions and returns structured decisions. Choice selects from options, Score evaluates a rubric, and Noul returns a zero-to-one value for a focused truth question.
+
+### Does the documentation explain how RLCD works?
+
+No. The supplied official pages state that Jev is trained with RLCD to return calibrated decisions, but they do not define the acronym or disclose enough technical detail to reproduce or independently assess the training process.
+
+### Can Jev generate text like a chat model?
+
+No. Jev is designed for structured judgments consumed by code, not open-ended writing. A generative model remains the appropriate tool when the required output is prose rather than a bounded decision.
+
+### Should an application use `jev-latest` or a pinned version?
+
+Use `jev-latest` when automatically receiving the current stable release is acceptable. Pin `jev-1.13.0` when thresholds have been validated against that version and behavior must not change merely because an alias advances. In either case, log the version returned by the service.

@@ -1,0 +1,178 @@
+export const metadata = {
+  "title": "Jev AI Quickstart: Create Your First Typed Decision",
+  "description": "Use this Jev AI quickstart to send one Python request with Noul, Choice, and Score questions, interpret typed results, and apply practical decision rules.",
+  "category": "api",
+  "date": "2026-09-20",
+  "status": "draft"
+};
+
+## Jev AI Quickstart: Goal and Requirements
+
+This Jev AI quickstart shows you how to submit one state, evaluate it with three typed questions, and use the resulting probabilities in application logic. By completing this Jev AI quickstart, you will understand the Python request structure, the returned answer types, and the limits you should consider before automating decisions. Jev evaluates information rather than generating open-ended text, so it is suited to classification, routing, scoring, and other focused judgments.
+
+Jev is TypeSafe AI's first System One model. A System One request presents a shared `state` and one or more independent `questions`; the model returns structured answers instead of prose. TypeSafe says Jev is trained with reinforcement learning for calibrated decisions, or RLCD, and does not use customer-specific fine-tuning or LoRA adapters. See the [TypeSafe model documentation](https://docs.typesafe.ai/models.md) for the official model description.
+
+For this tutorial, the example evaluates a customer support message. It asks Jev to choose a department, estimate urgency, and score frustration in one request.
+
+You need:
+
+- A TypeSafe account and API key for the direct TypeSafe API.
+- A Python environment with the TypeSafe SDK available.
+- The `TYPESAFE_API_KEY` environment variable configured for the client.
+- A text or JSON-compatible state to evaluate.
+
+The documented Python interface imports `TypeSafeClient` and typed question classes from `typesafe_sdk`. TypeSafe's examples initialize `TypeSafeClient` as a context manager and call `client.system_one`. The related LangChain integration also reads `TYPESAFE_API_KEY`, as shown in [LangChain's Jev overview](https://www.langchain.com/blog/building-a-harness-with-jev).
+
+## Choose the Right Jev Question Type
+
+Every question needs an ID, a type, and clear instructions. `Choice` and `Score` also require criteria, while `Noul` can optionally use criteria to define what true and false mean.
+
+| Question type | Use it when | Returned fields |
+|---|---|---|
+| `Noul` | You need the probability that a clearly defined statement is true | `noul` |
+| `Choice` | The answer must be one member of a fixed, unordered set | `choice`, `probabilities`, `confidence` |
+| `Score` | The answer falls along ordered, described levels | `score`, `legend`, `probabilities`, `confidence` |
+
+These result shapes come from the official [TypeSafe primitives documentation](https://docs.typesafe.ai/primitives.md). A Noul result ranges from 0 to 1: values near 1 support yes, values near 0 support no, and values near 0.5 indicate uncertainty. Unlike Choice and Score, Noul does not return a separate confidence field.
+
+Choice works well for department routing, document categories, or programming-language detection. Include an `other` option when your list may not cover every valid input.
+
+Score is appropriate for ordered concepts such as severity or frustration. Its numeric result can fall between defined levels. The accompanying legend maps the numeric positions back to the criteria you supplied.
+
+Do not use Noul to represent an undefined spectrum. For example, asking whether someone is "strong" at Python leaves the meaning of strong unclear. A Score with levels such as no experience, occasional use, daily use, and deep expertise gives the model and your application a better-defined scale.
+
+A useful Jev AI quickstart rule is to match the question type to the code path you need:
+
+| Application decision | Suitable primitive | Why |
+|---|---|---|
+| Route a ticket to one team | `Choice` | The selected option maps directly to a queue |
+| Detect whether a refund was requested | `Noul` | Your code can compare the probability with a validated threshold |
+| Rank customer frustration | `Score` | Ordered criteria define the scale |
+| Generate a personalized reply | None | Jev does not generate open-ended text |
+
+Jev complements rather than replaces a generative model. Use it for structured decisions, then use a chat or text-generation model when the workflow requires writing, explanation, or open-ended reasoning.
+
+## Send Your First Jev Request
+
+The following Jev AI quickstart request uses the documented Python SDK classes and `client.system_one` method. It sends the support message once and evaluates all three questions against the same state.
+
+```python
+from typesafe_sdk import Choice, Noul, Score, TypeSafeClient
+
+state = {
+    "ticket_message": (
+        "Our checkout integration has returned errors since this morning. "
+        "Customers cannot complete their orders, and we need help now."
+    )
+}
+
+questions = {
+    "department": Choice(
+        instructions=(
+            "Which team should handle the problem described in "
+            "`ticket_message`?"
+        ),
+        criteria={
+            "billing": "Charges, invoices, refunds, or subscriptions.",
+            "technical": "Product bugs, outages, or integration failures.",
+            "sales": "Pricing, upgrades, or new-account questions.",
+            "other": "A request that does not fit the other options.",
+        },
+    ),
+    "is_urgent": Noul(
+        instructions=(
+            "Does `ticket_message` describe a problem requiring "
+            "prompt attention?"
+        ),
+    ),
+    "frustration": Score(
+        instructions=(
+            "How frustrated does the customer appear in `ticket_message`?"
+        ),
+        criteria=[
+            "Calm and neutral.",
+            "Concerned but civil.",
+            "Very angry or using strong language.",
+        ],
+    ),
+}
+
+with TypeSafeClient() as client:
+    response = client.system_one(
+        state=state,
+        questions=questions,
+    )
+
+print(response.answers["department"].choice)
+print(response.answers["department"].probabilities)
+print(response.answers["is_urgent"].noul)
+print(response.answers["frustration"].score)
+print(response.answers["frustration"].legend)
+```
+
+This follows the request and response access patterns documented by TypeSafe. The specific state and wording are tutorial examples; no particular output is guaranteed here.
+
+The backtick paths inside the instructions identify the relevant state field. TypeSafe recommends explicit dot-and-index paths when a state contains multiple records, messages, policies, or other fields. Although the question ID is useful to your code, it is not sent to the model, so the instructions must still express the complete judgment.
+
+The direct TypeSafe API serves Jev models through `POST /v1/systemone`. The SDK defaults to the `jev-latest` alias, which pointed to `jev-1.13.0` when the supplied documentation was collected. An alias can move to a later model release, while a versioned model ID remains pinned.
+
+| Model selection | Documented meaning | Practical consideration |
+|---|---|---|
+| `jev-latest` | Most recent stable official release | Convenient, but behavior may change when the alias advances |
+| `jev-preview` | Most recent release, including previews | May advance before the stable alias |
+| `jev-1.13.0` | A specific model version | Useful when thresholds were validated against that version |
+
+The response reports the versioned model that handled a request. Logging that value can help you associate evaluation results with a specific release.
+
+Cloudflare also documents Jev as the third-party Workers AI model `typesafe/jev`. Its request envelope differs from the direct TypeSafe SDK, so choose one provider path and follow its corresponding format. The [Cloudflare Jev model page](https://developers.cloudflare.com/ai/models/typesafe/jev/index.md) includes Workers JavaScript and Cloudflare API examples.
+
+## Read Results, Set Policy, and Respect Limits
+
+A Jev answer is evidence for your application logic, not the policy itself. Your code decides what probability or confidence is sufficient for automation, when to request human review, and what action each result permits.
+
+For example, a support workflow could route a high-confidence Choice automatically while sending ambiguous distributions to an unassigned queue. It could place high-urgency tickets earlier in a queue without allowing the model to perform irreversible account actions.
+
+Thresholds should come from evaluation against representative data. The sources do not prescribe a universal urgency threshold or confidence cutoff, so this Jev AI quickstart does not invent one. Test candidate values against labeled examples, account for the cost of false positives and false negatives, and retain a manual path for uncertain or consequential cases.
+
+Multiple questions that use the same state should normally be sent together. TypeSafe says questions in one request are evaluated independently and in parallel. Adding or removing one question does not provide hidden context to the others, and each answer remains associated with its question ID.
+
+This independence has two consequences:
+
+- Ask speculative questions in the same request when they use the original state, then ignore answers your code does not need.
+- Make a second request only when its state or available criteria genuinely depend on an earlier answer.
+
+Keep each question focused on one quick judgment. A broad instruction such as "analyze this ticket and decide everything we should do" combines reasoning, policy, and execution. Break that task into atomic questions, then combine their outputs in ordinary code.
+
+The following limits and caveats are documented for Jev 1.13:
+
+| Area | Documented information | What it means for a quickstart |
+|---|---|---|
+| Input | Text only; state may be a string, JSON object, or array of text values | Convert images, audio, video, and binary data to text before evaluation |
+| Context | 64,000 tokens per request; 32,000 for state plus the longest question | Keep both total request size and the longest state-question pair within limits |
+| Pricing | $42 per billion input tokens, or $0.042 per million; output tokens are free | Verify current pricing before estimating a deployed workload |
+| Rate limits | 250,000 tokens per second and 1,200 requests per minute | A request exceeding either limit can receive HTTP 429 |
+| Language | English is the primary and strongest training language | Evaluate accuracy carefully before relying on other languages |
+
+TypeSafe warns that published rate limits are adjusting dynamically and may change without notice. Its client SDKs retry with backoff by default and honor `retry-after` when a response includes it. Direct HTTP integrations need their own rate-limit handling.
+
+The direct TypeSafe docs also state that Jev is not trained on customer requests or responses. Enterprise zero-data-retention details are covered by TypeSafe's legal materials, but the supplied sources do not support treating every account as automatically covered by enterprise ZDR terms.
+
+A sound Jev AI quickstart should therefore end with evaluation, not immediate high-impact automation. Record the model version, question definitions, probabilities, selected answers, and eventual human or system outcomes. That information lets you review errors and retune application thresholds when your criteria or model version changes.
+
+## Jev AI Quickstart FAQ
+
+### Does Jev generate customer replies?
+
+No. Jev evaluates a state and returns typed Noul, Choice, or Score answers. It does not generate open-ended prose. A workflow can use Jev for routing or classification and pass the result to a separate generative model when a written reply is required.
+
+### Can one request contain different question types?
+
+Yes. One request can mix Noul, Choice, and Score questions against the same state. TypeSafe recommends sending questions together when they do not depend on one another's answers because they are evaluated independently and in parallel.
+
+### Should I use `jev-latest` or a versioned model?
+
+Use `jev-latest` when automatically receiving stable updates is acceptable. Pin a version such as `jev-1.13.0` when you have validated thresholds against that release and want to control when model changes enter your application.
+
+### What is the most important next step after this Jev AI quickstart?
+
+Build a representative evaluation set and measure how candidate thresholds behave on it. Review uncertain and high-consequence cases manually, keep question instructions specific, and re-evaluate your policy whenever the model version, input distribution, or business rules change.
