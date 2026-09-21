@@ -1,8 +1,9 @@
 export const metadata = {
-  "title": "Jev AI Quickstart: Create Your First Typed Decision",
-  "description": "Use this Jev AI quickstart to send one Python request with Noul, Choice, and Score questions, interpret typed results, and apply practical decision rules.",
+  "title": "Jev AI Quickstart: How to Use Jev AI Now",
+  "description": "Use this Jev AI quickstart to try the Playground, call the TypeSafe API, compare provider routes, and build typed Noul, Choice, and Score decisions.",
   "category": "api",
   "date": "2026-09-20",
+  "lastModified": "2026-09-21",
   "status": "draft"
 };
 
@@ -16,12 +17,30 @@ For this tutorial, the example evaluates a customer support message. It asks Jev
 
 You need:
 
+- A TypeSafe login if you want to start in the official Playground.
 - A TypeSafe account and API key for the direct TypeSafe API.
 - A Python environment with the TypeSafe SDK available.
 - The `TYPESAFE_API_KEY` environment variable configured for the client.
 - A text or JSON-compatible state to evaluate.
 
 The documented Python interface imports `TypeSafeClient` and typed question classes from `typesafe_sdk`. TypeSafe's examples initialize `TypeSafeClient` as a context manager and call `client.system_one`. The related LangChain integration also reads `TYPESAFE_API_KEY`, as shown in [LangChain's Jev overview](https://www.langchain.com/blog/building-a-harness-with-jev).
+
+## Use Jev AI Now: Current Access Paths
+
+If you are checking whether Jev AI is usable today, start with the official TypeSafe flow. TypeSafe's current quick start sends users to the Playground, then to an API key from the dashboard, then to `POST https://api.typesafe.ai/v1/systemone` with `model` set to `jev-latest`. The same page also shows Python SDK setup with `pip install typesafe-sdk` or `uv add typesafe-sdk`.
+
+This matters because Jev is not a normal chat-completions model. A working integration sends `state` plus typed `questions`, then reads structured answers. Provider routes can be useful, but each one has its own request wrapper and model identifier.
+
+| Route | What to use | Best first step |
+|---|---|---|
+| TypeSafe Playground | Browser-based test area | Open the [TypeSafe Playground](https://console.typesafe.ai/playground), paste a state, and add a Noul question |
+| TypeSafe API | `POST /v1/systemone` with `jev-latest` | Get a key from the [TypeSafe dashboard](https://console.typesafe.ai/keys) and run a small cURL request |
+| TypeSafe SDKs | Python or JavaScript SDK | Install the SDK and let the client read `TYPESAFE_API_KEY` |
+| Cloudflare Workers AI | `typesafe/jev` | Follow Cloudflare's Workers AI or REST request shape for structured evaluations |
+| Vercel AI Gateway | Vercel's Jev model listing | Use it when your app already routes model calls through Vercel AI Gateway |
+| OpenRouter | `typesafe/jev-1.13` via Decisions API | Use the Decisions API rather than chat-completions clients |
+
+Do not treat these routes as evidence that Jev model weights are open source. The public paths are hosted APIs, provider integrations, documentation, and community examples. For searches like "Jev GitHub" or "Jev open source," the safest rule is to verify ownership and API shape against TypeSafe's official docs before copying code.
 
 ## Choose the Right Jev Question Type
 
