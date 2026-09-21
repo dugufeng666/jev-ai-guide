@@ -1,8 +1,9 @@
 export const metadata = {
-  "title": "Jev AI GitHub Guide: Gist, Official Docs, and Setup",
-  "description": "Use this Jev AI GitHub guide to distinguish the community project reference from official TypeSafe docs, inspect model details, and plan safe integration.",
+  "title": "Jev AI GitHub: Open Source, Local, and Docs Guide",
+  "description": "Use this Jev AI GitHub guide to check open-source claims, local model questions, Hugging Face searches, official docs, and safe setup paths.",
   "category": "typesafe",
   "date": "2026-09-20",
+  "lastModified": "2026-09-21",
   "status": "draft"
 };
 
@@ -17,8 +18,27 @@ This distinction matters because a GitHub page can be documentation, an example,
 | [Community project reference on GitHub Gist](https://gist.github.com/pjburnhill/adf8d28efcad9df037bfdece178ef965) | A broad reference covering Jev concepts, architecture, primitives, patterns, and limitations | Use it as an orientation aid, then verify implementation details against TypeSafe |
 | [TypeSafe introduction](https://docs.typesafe.ai/introduction.md) | Official explanation of Jev, System One models, and the three question primitives | Use it for the core product model and design guidance |
 | [TypeSafe models page](https://docs.typesafe.ai/models.md) | Official model identifiers, pricing, limits, input constraints, aliases, and model-listing examples | Check it before selecting a model or estimating request constraints |
+| [TypeSafe quick start](https://docs.typesafe.ai/introduction/quickstart.md) | Official Playground, API key, cURL, and SDK starting path | Use it to test a real hosted request before trusting community snippets |
 
 The GitHub Gist calls itself a working project reference with a knowledge date of September 16, 2026. That makes it useful for navigation and conceptual summaries, but it should not be treated as an official release record or API contract.
+
+## Is Jev Open Source, Local, or on Hugging Face?
+
+Search interest around Jev AI GitHub often overlaps with searches for `jev open source`, `jev local`, and `jev huggingface`. Those are reasonable questions, but they point to different things: source code, model weights, local inference, hosted APIs, and third-party examples are not the same.
+
+Based on the official TypeSafe documentation available to this site, Jev should be treated as a hosted System One API model rather than a downloadable open-source model. TypeSafe documents the hosted endpoint, API keys, SDKs, model aliases, pricing, limits, and provider access routes. It does not document public Jev model weights, a local inference package, or a Hugging Face model card for running Jev offline.
+
+| Search intent | Current answer | What to do instead |
+| --- | --- | --- |
+| `jev open source` | No public Jev model weights are established by the official docs used here | Use the hosted TypeSafe API or documented provider routes |
+| `jev local` | No official local Jev runtime is documented | Keep sensitive policy and thresholds in local code, and call Jev only for bounded decisions |
+| `jev huggingface` | No official Hugging Face Jev weights are established by the supplied evidence | Verify any listing against TypeSafe links before trusting it |
+| `jev github` | A GitHub result can be a Gist, example, SDK, or community note | Check owner, license, links, and current TypeSafe docs |
+| `openjev` | Treat as an unverified name unless it links to official TypeSafe material | Do not assume API compatibility or model ownership |
+
+The practical rule is simple: Jev access is public through documented hosted paths, not through public weights. Start with the [TypeSafe quick start](https://docs.typesafe.ai/introduction/quickstart.md), then compare provider pages such as Cloudflare, Vercel, or OpenRouter if your stack already uses one of those platforms.
+
+This does not make Jev unusable for private workflows. It changes the architecture. Keep deterministic checks, secrets, permissions, billing, deletion, and review policy in your own code. Send Jev only the textual state needed for a specific Noul, Choice, or Score question, then log the returned model version and probabilities.
 
 ## Understand What Jev Does Before Looking for Code
 
@@ -167,6 +187,18 @@ The supplied sources do not establish one. They provide a community GitHub Gist 
 ### Is Jev open source?
 
 The evidence does not say that Jev's model weights or implementation are open source. A GitHub-hosted reference document is not evidence of an open-source release.
+
+### Can I run Jev locally?
+
+The official documentation used for this guide does not document a local Jev runtime or downloadable weights. Use the hosted TypeSafe API or documented provider integrations, and keep your application rules, thresholds, logs, and irreversible actions in local code.
+
+### Is Jev available on Hugging Face?
+
+This guide does not have evidence of an official Hugging Face Jev model card or public weights. If you find a Hugging Face page using the Jev name, verify its owner and links against TypeSafe before relying on it.
+
+### What is OpenJev?
+
+Treat `openjev` as unverified unless a specific project links back to official TypeSafe material and clearly explains what it is. A similar name does not prove that it is Jev, that it uses TypeSafe's API, or that it provides official Jev model weights.
 
 ### Can I use GitHub examples instead of the TypeSafe documentation?
 

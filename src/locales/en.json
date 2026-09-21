@@ -271,7 +271,7 @@
         {
           "order": 7,
           "name": "Jev AI Source Library",
-          "description": "Keep research organized by separating official pages, provider documentation, technical demos, and community experiments.",
+          "description": "Keep research organized by separating official pages, provider docs, GitHub references, open-source claims, and community experiments.",
           "href": "/typesafe/jev-ai-github",
           "displayType": "card-list",
           "highlights": [
@@ -288,8 +288,8 @@
               "detail": "Cloudflare, Vercel, and other provider pages for deployment and access context."
             },
             {
-              "label": "Video",
-              "detail": "Tutorial and showcase videos that demonstrate use cases and developer workflows."
+              "label": "Weights",
+              "detail": "Open-source, local, and Hugging Face claims that need verification before use."
             }
           ]
         },
