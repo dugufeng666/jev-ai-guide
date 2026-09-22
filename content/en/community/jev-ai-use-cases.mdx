@@ -1,8 +1,9 @@
 export const metadata = {
-  "title": "Jev AI Use Cases: A Practical Agent Decision Guide",
-  "description": "Explore jev ai use cases for model routing, tool-call checks, and support triage, with a source-grounded workflow, decision types, and practical limits.",
+  "title": "Jev AI Use Cases: 12 Practical Decision Examples",
+  "description": "Explore Jev AI use cases across GEO, RAG filtering, citation checks, browser agents, skill routing, guardrails, support triage, and data workflows.",
   "category": "community",
   "date": "2026-09-20",
+  "lastModified": "2026-09-22",
   "status": "draft"
 };
 
@@ -13,6 +14,8 @@ The most practical **jev ai use cases** are narrow decisions that software can c
 Jev is not a conventional large language model. It does not generate prose. TypeSafe calls it a System One model because it evaluates a supplied state and returns typed decisions, according to [LangChain's guide to building a harness with Jev](https://www.langchain.com/blog/building-a-harness-with-jev).
 
 This distinction determines when to use it. Jev can support an agent by making structured decisions between steps, while a generative model remains responsible for conversation, writing, explanation, and open-ended reasoning.
+
+The most reusable pattern across the strongest public examples is a three-part division of labor: a generative model handles writing or complex reasoning, Jev handles classification, filtering, scoring, and selection, and ordinary code executes the downstream action. High-impact or ambiguous cases should still preserve a human review path.
 
 | Task | Fit for Jev | Source-backed reason |
 |---|---|---|
@@ -44,6 +47,37 @@ Threshold selection is an application decision, not a documented universal setti
 Jev can also evaluate multiple questions about one state in a single request. LangChain reports that these questions are evaluated in parallel and that adding questions has little effect on response time beyond the additional question tokens. That makes multi-label classification one of the more distinctive Jev AI use cases supported by the source.
 
 For example, a support workflow could assess urgency, topic, and difficulty from the same incoming message. Those labels could then control prioritization or routing without requiring three separate generative responses.
+
+## 12 Jev AI Use Cases Worth Studying
+
+The examples below are organized as a source-backed case library. Some come from official TypeSafe cookbooks, while others are community or platform projects that should be treated as implementation references rather than universal proof of production performance.
+
+| # | Case | Source | What Jev decides | Practical lesson |
+|---:|---|---|---|---|
+| 1 | GEO brand-mention evaluation in Notra | [Notra GitHub repository](https://github.com/usenotra/notra) | Brand visibility, recommendation position, and evaluation-style signals around AI answers | GEO monitoring can use Jev-like evaluation beside a judge LLM instead of relying only on generated summaries |
+| 2 | Entity alignment and deduplication | [TypeSafe entity alignment cookbook](https://docs.typesafe.ai/cookbooks/entity_alignment.md) | Whether two product records should merge, remain separate, or go to a curator | Use a Score rubric when there are three operational outcomes, not only yes-or-no |
+| 3 | RAG passage filtering and conflict checks | [TypeSafe RAG passage cookbook](https://docs.typesafe.ai/cookbooks/classifying_rag_passages.md) | Passage relevance, contradiction, and prompt-injection risk before generation | Put Jev before the answer model so code decides which evidence enters context |
+| 4 | Citation support checking | [TypeSafe citation check cookbook](https://docs.typesafe.ai/cookbooks/citation_check.md) | Whether quoted context supports a claim | Useful for GEO articles, research reports, and source-heavy pages where false citations are expensive |
+| 5 | Browser action selection | [Browser Use Jev Ultrafast](https://github.com/browser-use/jev-ultrafast) | Which operation and page element should be used next | Web automation fits Jev when each step can be framed as choosing from observed controls |
+| 6 | Agent skill selection | [TypeSafe skill suggestion cookbook](https://docs.typesafe.ai/cookbooks/skill_suggestion.md) | Which skill, if any, should be loaded for an agent turn | Large tool or skill catalogs can be reduced to a small decision instead of stuffed into context |
+| 7 | Tool-call risk review | [LangChain Jev harness article](https://www.langchain.com/blog/building-a-harness-with-jev) | Whether an agent action should proceed, pause, or route to another path | Jev can sit before execution, but code permissions and human approval still matter |
+| 8 | Vercel AI Gateway evaluation route | [Vercel Jev model page](https://vercel.com/ai-gateway/models/jev) | Typed evaluation through the `typesafe-ai/jev` model route | Gateway users can add Jev as an evaluation model without treating it as a chat generator |
+| 9 | LLM guardrails | [TypeSafe guardrails cookbook](https://docs.typesafe.ai/cookbooks/llm_guardrails.md) | Hazard categories and severity around messages going into or out of an LLM app | Guardrails work best when policy remains in code and Jev supplies structured signals |
+| 10 | Structured-data-extraction cascade | [TypeSafe SDE cascade cookbook](https://docs.typesafe.ai/cookbooks/sde_cascade.md) | Whether a cheaper extraction result is good enough or needs a stronger model | Jev can verify intermediate outputs in a cost-saving cascade |
+| 11 | Text-to-feature modeling | [TypeSafe autoresearch feature discovery cookbook](https://docs.typesafe.ai/cookbooks/autoresearch_feature_discovery.md) | Numeric or categorical features derived from text | Convert qualitative text into model features, then let a conventional model learn from them |
+| 12 | Support-ticket routing pattern | [TypeSafe quick start](https://docs.typesafe.ai/introduction/quickstart.md) | Department, urgency, and frustration signals from one ticket | A single state can produce several business routing signals in one request |
+
+Two community cases from the shared social post were not added as verified source examples because the supplied shortened links did not resolve to stable, accessible sources during review: ReplyNodes and Paper Trellis. They remain useful ideas to watch, but a source-grounded guide should not present them as confirmed references until the exact repositories or docs can be verified.
+
+### What the case library shows
+
+These examples are different on the surface, but the operating pattern is consistent:
+
+- **Classify before acting.** Jev returns a typed signal; application code decides the branch.
+- **Filter before generating.** RAG, citation, and guardrail examples all use Jev before a generative model produces or trusts an answer.
+- **Score for review.** Scores are useful when the outcome should be a rubric or escalation level, not a hard binary.
+- **Keep deterministic checks in code.** Jev should not authorize refunds, execute commands, publish content, or merge records by itself.
+- **Use human review for uncertainty.** Curators, support agents, editors, and admins remain part of the workflow where errors matter.
 
 ## Practical Jev AI Use Cases
 
