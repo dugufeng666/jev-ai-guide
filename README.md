@@ -18,17 +18,7 @@ Set `NEXT_PUBLIC_SITE_URL` to the production URL if it differs from the fallback
 NEXT_PUBLIC_SITE_URL=https://jev-ai-guide.com
 ```
 
-Optional light Adsterra display ads are supported on article pages. Leave them disabled while the site is under review or when no publisher zone is ready:
-
-```text
-NEXT_PUBLIC_ADSTERRA_ENABLED=1
-NEXT_PUBLIC_ADSTERRA_BANNER_KEY=your_adsterra_banner_key
-NEXT_PUBLIC_ADSTERRA_BANNER_WIDTH=728
-NEXT_PUBLIC_ADSTERRA_BANNER_HEIGHT=90
-NEXT_PUBLIC_ADSTERRA_SCRIPT_DOMAIN=www.highperformanceformat.com
-```
-
-Use a banner/native display zone first. Avoid popunder, social bar, and forced-redirect formats on this site because they can hurt early SEO signals and user trust.
+Light Adsterra article ads are enabled in `src/components/ads/adsterra-ads.tsx`: one responsive display slot after the article body and one native slot after related guides. Avoid popunder, social bar, and forced-redirect formats on this site because they can hurt early SEO signals and user trust.
 
 ## Getting Started
 
