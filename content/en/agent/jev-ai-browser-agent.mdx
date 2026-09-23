@@ -1,0 +1,134 @@
+export const metadata = {
+  "title": "Jev AI Browser Agent: Examples, Limits, and Patterns",
+  "description": "Study Jev AI browser agent projects including Browser Use Jev Ultrafast, Jev Browser, voice browser, TypeSafe playground, action spaces, and safety gates.",
+  "category": "agent",
+  "date": "2026-09-23",
+  "status": "draft"
+};
+
+## Why Jev AI Browser Agents Are Spreading
+
+A **Jev AI browser agent** is one of the clearest ways to understand the model's role. The browser supplies a visible state, the application turns that state into candidate actions, Jev chooses from those candidates, and Playwright or another automation layer executes the result.
+
+This is different from asking a general-purpose LLM to “browse the web.” Jev does not see screenshots by default, does not invent selectors, and does not write a plan in natural language. In the strongest examples, application code owns the browser, the action budget, validation, logging, and stop conditions. Jev supplies bounded judgments such as operation, target element, command completeness, or whether the task appears finished.
+
+Recent open-source examples make the pattern concrete: [Browser Use Jev Ultrafast](https://github.com/browser-use/jev-ultrafast), [jkudish/jev-browser](https://github.com/jkudish/jev-browser), [moritzkremb/jev-voice-browser](https://github.com/moritzkremb/jev-voice-browser), and the [TypeSafe playground browser-agent documentation](https://github.com/TypeSafeAI/typesafe-playground/blob/main/docs/jev-browser-agent.md).
+
+| Project | What it shows | Jev's main decision |
+|---|---|---|
+| Browser Use Jev Ultrafast | Fast browser task loop with indexed action space | Operation and compatible page element |
+| jkudish/jev-browser | MCP, CLI, and library style browser navigation | One action per step plus goal/stuck scoring |
+| moritzkremb/jev-voice-browser | Voice-controlled headed Chromium | Intent, target, completion, and destructive-action gates |
+| TypeSafe playground browser agent | Demo environment with inspector and exportable logs | Operation, target head, and validation-aware browser actions |
+
+## The Core Browser-Agent Pattern
+
+Most Jev browser projects follow the same architecture.
+
+| Stage | Component | Responsibility |
+|---|---|---|
+| Observe | Browser automation code | Read visible controls, text, values, and page state |
+| Index | Application code | Build numbered candidate elements and compatible operations |
+| Decide | Jev | Choose an operation, target, score, or gate result |
+| Validate | Application code | Check freshness, occlusion, allowed operation, and confidence policy |
+| Execute | Playwright or browser driver | Click, type, scroll, select, wait, stop, or block |
+| Log | Application code | Record state, answers, confidence, probabilities, and outcome |
+
+Browser Use's README describes the action space explicitly: the page becomes an element table, supported operations are offered, and one TypeSafe request asks for the operation plus compatible target heads. If the chosen operation is `CLICK`, only the click target can execute. If it is `TYPE_TEXT`, a small text model supplies typed text while Jev chooses the action and element.
+
+The TypeSafe playground documentation describes a similar loop with element tables, visible text, operation choices, target heads, validation, and JSON export. Its limits are also important: no shadow DOM, frames, canvas, uploads, pop-up tabs, nested scrolling, or arbitrary keyboard widgets in the described MVP.
+
+## Browser Use Jev Ultrafast
+
+Browser Use's `jev-ultrafast` is the most visible browser-agent example. It reports a Google Flights task from Zurich to London in 7.1 seconds, including text generation and loading waits. That number is useful as an author-reported demo result, not a universal browser-agent benchmark.
+
+The important technical idea is not only speed. It is separation of responsibilities.
+
+| Responsibility | Browser Use Jev Ultrafast approach |
+|---|---|
+| Browser state | Read visible controls, names, values, and text atomically |
+| Action choice | Jev picks an operation and matching target |
+| Text entry | A small LLM writes text only when needed |
+| Safety | Executor rechecks page freshness and click occlusion |
+| Traceability | The inspector shows numbered elements, probabilities, and actions |
+
+This makes the project a good starting point for understanding Jev AI browser agents. The model does not output executable JavaScript, coordinates, selectors, or shell commands. It chooses among options prepared by the browser layer.
+
+## Jev Browser as MCP, CLI, and Library
+
+`jkudish/jev-browser` extends the pattern into developer tooling. Its README describes a headless browser controlled through an MCP server, CLI, or library. The package asks Jev to pick one action per step from clickable, typeable, and selectable elements, while code owns budgets, recovery, stop gates, traces, console errors, and screenshots.
+
+That is an important product shape because it moves Jev browser use closer to coding agents. The README includes setup snippets for clients such as Amp, Claude Code, Codex, OpenCode, and generic MCP clients. It also documents `npx -y @jkudish/jev-browser` as the package entry point.
+
+| Interface | Use case |
+|---|---|
+| MCP server | Let a coding agent request browser navigation as a tool |
+| CLI | Run one browser task from the terminal |
+| Library | Call `navigate()` from application code |
+| Existing Playwright page | Attach Jev Browser to a browser your app already owns |
+
+The credential-handling notes are especially useful. The project documents seed cookies and password fill mechanisms designed to avoid passing secrets through model prompts, command arguments, traces, screenshots, and environment probing. Those controls do not make every site safe, but they show the right architectural instinct: sensitive values belong in code-controlled channels, not in model-visible state.
+
+## Voice Browser: Jev on Partial Speech
+
+`moritzkremb/jev-voice-browser` shows a different browser-agent angle: voice control. Speech is captured through the browser's Web Speech API, partial transcripts are sent to a Node server, and the server asks Jev typed questions about intent, target, completeness, whether the speech is a command, and whether the action is destructive.
+
+The README reports roughly 250 to 350 ms Jev requests after warmup and says real API calls cost about $0.0002 each. The tests section reports 34 real-API integration cases passing in the author's environment, with average Jev latency around 330 ms. Treat those as author-reported project measurements, not independent benchmarks from this site.
+
+| Voice-browser design choice | Why it matters |
+|---|---|
+| Web Speech API in Chrome or Edge | Audio transcription is external to Jev |
+| Partial transcript loop | Jev can decide whether a command is complete |
+| Numbered overlays | Ambiguous targets can be resolved by spoken numbers without another model call |
+| Destructive gate | Actions such as purchase or delete can require confirmation |
+| Code-extracted spans | URLs, search text, and typed text are selected or normalized by code, not generated by Jev |
+
+This is a strong example because it proves a broader point: Jev's useful role is not limited to typed web pages. Any interface that can be converted into textual state and candidate actions can potentially use the same decision pattern.
+
+## What to Verify Before Trusting a Browser Demo
+
+Browser-agent demos can look magical, so the verification checklist matters.
+
+| Claim | What to check |
+|---|---|
+| “The agent browses the web” | Does the model receive a structured element table, screenshot, accessibility tree, or raw DOM? |
+| “It is faster than LLM agents” | Is timing measured across multiple tasks, and are navigation/loading waits included? |
+| “It can log in safely” | Are passwords and cookies hidden from the model, traces, video, and command history? |
+| “It can click safely” | Are target freshness, occlusion, origin, and destructive actions validated by code? |
+| “It works on real sites” | Are examples reproducible, and are hard sites or failures disclosed? |
+| “It is cheap” | Are token counts, number of requests, and text-helper costs shown separately? |
+
+The best Jev AI browser agent projects disclose what Jev saw, what choices it could make, what probabilities it returned, and why an action was accepted or rejected. A video alone is less valuable than an exportable trace.
+
+## Practical Design Rules
+
+If you are building a Jev AI browser agent, start with a small, auditable action space.
+
+- Offer operations such as `CLICK`, `TYPE_TEXT`, `SELECT`, `SCROLL`, `WAIT`, `DONE`, and `BLOCKED`.
+- Give each visible element a stable per-snapshot ID.
+- Keep offscreen, hidden, or irrelevant page text out of the state.
+- Make target heads compatible with the selected operation.
+- Let code type passwords, cookies, exact URLs, and exact text when possible.
+- Revalidate the target after Jev answers and before execution.
+- Require confirmation for destructive or irreversible actions.
+- Log the state, chosen operation, target, probabilities, latency, and execution result.
+
+The recurring lesson is that Jev should not own the browser. Jev should choose among bounded options while the application owns permissions, validation, side effects, and recovery.
+
+## FAQ
+
+### What is a Jev AI browser agent?
+
+A Jev AI browser agent is a browser automation loop where application code observes the page and offers candidate actions, while Jev chooses an operation, target, score, or gate result from typed questions.
+
+### Does Jev see screenshots in browser agents?
+
+Not in the default examples discussed here. Browser Use says its default loop avoids screenshots and feeds structured state. Other projects may use accessibility trees, element labels, transcripts, or compact page snapshots. Always check what state is actually sent.
+
+### Can Jev type text into forms?
+
+Jev can help choose where typing should happen, but text generation or exact text extraction usually belongs to another component. Browser Use uses a small LLM for text when `TYPE_TEXT` is selected, while voice-browser extracts candidate spans in code.
+
+### Are Jev browser agents production ready?
+
+They are promising but still early. Use them first on low-risk pages, public information tasks, testing workflows, and internal tooling. For login, purchase, account changes, messaging, or deletion, require explicit code-level controls and human confirmation.
