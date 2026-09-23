@@ -1,0 +1,218 @@
+export const metadata = {
+  "title": "Jev AI Structured Extraction: Grounded Fields and Review",
+  "description": "Learn Jev AI structured extraction with candidate values, null options, source evidence, cascade verification, invoices, and document field workflows.",
+  "category": "community",
+  "date": "2026-09-23",
+  "status": "draft"
+};
+
+## What Is Jev AI Structured Extraction?
+
+**Jev AI structured extraction** is a constrained way to turn a document into fields without asking a model to invent arbitrary values. Code first finds candidate values in the source, then Jev ranks those candidates and can select `null` when none is suitable.
+
+The current [TypeSafe Playground document extraction workspace](https://jev.works/extraction) demonstrates this pattern with invoice dates, counterparties, amounts, and document types. Its guide says local logic finds exact source candidates, Jev ranks the candidates plus `null`, and each selected value can be traced back to source evidence.
+
+This is different from unconstrained JSON extraction:
+
+| Extraction style | What the model can return | Main risk |
+|---|---|---|
+| Free-form generation | Any text or JSON value | Invented values and hard-to-audit formatting |
+| Schema-constrained generation | Fields with a requested shape | Correct shape but unsupported content |
+| Candidate selection with Jev | A supplied candidate or `null` | Candidate generator may miss the answer |
+| Parser plus Jev verification | Exact matches plus semantic checks | More pipeline work, stronger audit trail |
+
+The goal is not to claim that candidate selection makes extraction perfect. It moves a major failure mode into an explicit place: if the correct value is not in the candidate set, the system must report a miss rather than silently create a new value.
+
+## The Closed-Set Extraction Pattern
+
+The most important design rule is simple: **Jev chooses; code finds and records.**
+
+| Stage | Code or model | Output |
+|---|---|---|
+| Source loading | Code | Document text and provenance |
+| Candidate generation | Code, parser, or search | Values and source spans |
+| Field question | Developer | What field should be selected |
+| Candidate ranking | Jev | One candidate or `null` |
+| Evidence attachment | Code | Exact source span and offsets |
+| Validation | Code | Format, arithmetic, and policy checks |
+| Escalation | Code and human | Review or stronger extraction path |
+
+The workspace's invoice example exposes this flow directly: load a document, select fields, find candidates, rank with Jev, and inspect the source evidence. It also keeps a provider error visible as a failed run rather than treating a failure as if the document had no value.
+
+That last distinction matters operationally. These states should remain different:
+
+- `selected`: a candidate was chosen.
+- `null`: no candidate was suitable.
+- `failed`: the provider or application could not complete the request.
+- `review`: the result needs a human or stronger model.
+
+Collapsing all four into an empty field makes debugging and data quality measurement much harder.
+
+## Invoice Extraction Example
+
+An invoice contains many values that look like valid answers: multiple dates, several amounts, a vendor, a bill-to company, tax, subtotal, and total. A good extractor must select the value for the requested field, not merely find a number somewhere in the text.
+
+| Field | Candidate-generation rule | Jev question |
+|---|---|---|
+| Invoice date | Find date-like spans near invoice labels | Which candidate is the invoice date? |
+| Due date | Find date-like spans near due-date labels | Which candidate is the payment due date? |
+| Counterparty | Find named organizations | Which candidate is the vendor or counterparty? |
+| Total due | Find currency values near total labels | Which candidate is the amount due? |
+| Document type | Use document text and known labels | Is this an invoice, receipt, quote, or other document? |
+
+The numeric fields still need exact validation in code. Jev can choose which amount corresponds to total due, but code should check currency parsing, decimal precision, subtotal arithmetic, tax arithmetic, and whether the result is within an allowed range.
+
+| Check | Good component |
+|---|---|
+| Select the amount associated with “total due” | Jev |
+| Parse `$1,250.00` into a decimal | Code |
+| Check subtotal plus tax equals total | Code |
+| Determine whether the source contains an invoice date | Jev or parser |
+| Compare invoice date and due date | Code |
+| Decide whether a mismatch requires review | Policy code |
+
+This division keeps semantic interpretation separate from arithmetic and date operations, which are better handled deterministically.
+
+## Why the Null Option Matters
+
+Every field should have a `null` candidate when the document does not contain a trustworthy value. Without it, Jev must choose among values that may all be wrong.
+
+| Source situation | Correct extraction behavior |
+|---|---|
+| One clear matching value | Select that candidate |
+| Several plausible values | Select only if criteria distinguish them; otherwise review |
+| No matching value | Return `null` |
+| Candidate parser failed | Record candidate-generation failure |
+| Provider request failed | Record `failed`, not `null` |
+| Source is ambiguous | Route to review |
+
+The null option is not an accuracy guarantee. It is an abstention path that lets the workflow say “the source does not provide a safe answer.” That is usually better than turning uncertainty into a fabricated field.
+
+The playground explicitly demonstrates removing a date from the source and comparing the next extraction. This is a useful test case for any implementation: delete the expected evidence, then confirm that the result can become `null` or review rather than selecting an unrelated date.
+
+## Source Evidence and Provenance
+
+An extracted field is more useful when it carries evidence. Store the selected value together with the source document, span, page or block, candidate list, and Jev result.
+
+| Evidence field | Example |
+|---|---|
+| `source_id` | Invoice or document identifier |
+| `field` | `invoice_date` |
+| `value` | `September 1, 2026` |
+| `source_text` | The exact sentence or span |
+| `start` / `end` | Character offsets |
+| `candidate_rank` | Position in the candidate list |
+| `probability` | Jev probability for the selected option |
+| `model` | Jev model version |
+| `status` | Selected, null, failed, or review |
+
+The evidence record lets an editor or data steward answer three questions:
+
+1. What value did the system select?
+2. Where did the value come from?
+3. Why was this candidate preferred over the alternatives?
+
+It also makes corrections easier. If a reviewer rejects a value, the system can retain the original candidate set and the corrected answer for future evaluation.
+
+## Candidate Generation Strategies
+
+Candidate generation is the bottleneck that closed-set extraction makes visible. If candidates are too broad, Jev has to choose among noise. If candidates are too narrow, the correct value never reaches the model.
+
+| Source type | Candidate strategy |
+|---|---|
+| Plain text invoice | Regex spans plus nearby labels |
+| HTML page | DOM text, metadata, and labeled-value pairs |
+| PDF text | Line and block extraction with page numbers |
+| OCR document | Token spans plus layout coordinates |
+| Email | Subject, sender, dates, and body spans |
+| Product feed | Existing field values plus aliases |
+| Contract | Clause and entity spans with section headings |
+
+Use deterministic parsing wherever the source format is stable. Use a generative or extraction model only when the candidate structure cannot be recovered reliably with rules. Jev is then a choice and verification layer, not the only parser in the system.
+
+Candidate generation should also preserve provenance. A list of values without their source locations is not enough for audit or review.
+
+## The SDE Cascade
+
+The official [TypeSafe SDE cascade cookbook](https://docs.typesafe.ai/cookbooks/sde_cascade.md) describes a cost-aware extraction pattern: a smaller model extracts fields, Jev checks the result, and difficult records are escalated to a stronger model.
+
+The cascade can be expressed as:
+
+1. Use a cheaper extractor for the easy majority.
+2. Run field-level Jev checks over the proposed values.
+3. Keep results that pass the policy.
+4. Escalate suspicious or incomplete fields.
+5. Send high-impact cases to human review.
+
+| Cascade stage | Purpose |
+|---|---|
+| Mini extraction | Produce a low-cost candidate result |
+| Jev verification | Identify unsupported, missing, or suspicious fields |
+| Strong extraction | Reprocess only difficult cases |
+| Deterministic validation | Check formats, totals, and exact constraints |
+| Human review | Resolve ambiguity and record the final decision |
+
+This design is more defensible than claiming that one model can extract every document perfectly. The system spends more compute only where the initial result is uncertain or risky.
+
+The official cookbook also supports a broader lesson: a Jev result should be used as a gate or signal. It should not silently rewrite the original field without preserving the proposed value, evidence, and reason for escalation.
+
+## Pre-Parsed Values and Span Selection
+
+Some extraction tasks are easier when the source parser already produces candidate values. Dates, amounts, names, URLs, SKUs, and email addresses can often be found with deterministic rules or a specialized parser.
+
+The [TypeSafe pre-parsed value extraction cookbook](https://docs.typesafe.ai/cookbooks/pre_parsed_value_extraction_cookbook.md) follows this direction: code extracts candidate values and Jev selects among them using the surrounding context.
+
+| Task | Candidate values | Jev decision |
+|---|---|---|
+| Date extraction | All date-like spans | Which date is the publication date? |
+| Amount extraction | Currency spans | Which amount is the total? |
+| Person extraction | Named-entity spans | Which person is the signing party? |
+| URL extraction | URLs in the source | Which link is the official documentation? |
+| Product extraction | SKU and product-name spans | Which item is the purchased product? |
+
+Span selection is often safer than free-form generation because the final value can be copied exactly from the source. The model chooses the meaning-bearing candidate; code preserves the original text.
+
+## Evaluation and Failure Modes
+
+Measure structured extraction at the field level, not only at the document level.
+
+| Metric | What it reveals |
+|---|---|
+| Candidate recall | Whether the correct value entered the candidate set |
+| Selection accuracy | Whether Jev chose the correct candidate |
+| Null precision | Whether null means “no safe candidate” rather than a missed parser result |
+| Evidence accuracy | Whether the stored span actually contains the selected value |
+| Field completeness | How often required fields are selected or escalated |
+| Escalation rate | How much work reaches a stronger model or human |
+| Exact validation rate | How often code checks pass for selected fields |
+
+Include these failure cases:
+
+- The source contains several similar dates.
+- The amount appears in subtotal, tax, and total lines.
+- A candidate is present but belongs to a different section.
+- The correct value is missing from the candidate list.
+- OCR introduces a character error.
+- The provider returns an error or timeout.
+- The document contains instructions aimed at the model.
+- The field is not applicable and should be `null`.
+
+Do not interpret a high Jev probability as proof that the value is correct. The probability is a signal for the declared choice, and the application still needs evidence and validation.
+
+## FAQ
+
+### Can Jev extract invoice fields?
+
+Yes, Jev can rank candidate dates, counterparties, amounts, and document types when the application supplies those candidates and a `null` option. Code should still validate arithmetic, formats, and source evidence.
+
+### Does Jev invent values in closed-set extraction?
+
+In the documented candidate-selection pattern, Jev chooses from the supplied candidates or `null`. That limits one kind of fabrication, but it does not fix a bad candidate generator or guarantee that the selected candidate is semantically correct.
+
+### What happens when a field is missing?
+
+The field should return `null`, review, or a visible extraction failure depending on the cause. A provider error should not be silently converted into a missing field.
+
+### Should Jev perform date comparison or invoice arithmetic?
+
+No. Use ordinary code for exact date ordering, totals, currency parsing, and arithmetic. Use Jev for the semantic choice of which source value corresponds to the requested field.
