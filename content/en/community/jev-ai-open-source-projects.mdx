@@ -1,0 +1,184 @@
+export const metadata = {
+  "title": "Jev AI Open Source Projects: 7 New Tools to Study",
+  "description": "Explore new Jev AI open source projects for RAG reranking, agent safety, YouTube sponsor detection, code linting, browser automation, and CLI workflows.",
+  "category": "community",
+  "date": "2026-09-23",
+  "status": "draft"
+};
+
+## The New Jev AI Open Source Project Wave
+
+The Jev AI open source ecosystem is already moving beyond simple API examples. New repositories are using Jev as a RAG evidence filter, a coding-agent safety gate, a YouTube sponsor detector, a semantic code linter, a browser action selector, and a command-line decision tool.
+
+That pattern is worth watching because each project gives Jev a narrow responsibility. The surrounding application owns retrieval, browser control, transcript timing, code scanning, permissions, or execution. Jev returns a bounded answer that the program can use.
+
+The projects below are community tools. They are useful implementation references, not official TypeSafe products or guarantees of production safety.
+
+| Project | Main category | Jev's role | Source |
+|---|---|---|---|
+| `jev-rag-benchmark` | Evaluation | Compare Jev reranking quality, cost, and latency | [GitHub](https://github.com/erendikmenn/jev-rag-benchmark) |
+| `jev-reranker` | RAG | Score and filter retrieved passages | [GitHub](https://github.com/hotchpotch/jev-reranker) |
+| `jev-sentinel` | Agent security | Review tool calls, tool output, and replies | [GitHub](https://github.com/harshwasan/jev-sentinel) |
+| `youtube-sponsor-detection` | Browser extension | Detect and skip sponsor segments | [GitHub](https://github.com/trungdq88/youtube-sponsor-detection) |
+| `perch` | Code quality | Check code against semantic rules | [GitHub](https://github.com/lakeday-org/perch) |
+| `jev` | CLI and Agent Skill | Run yes, pick, score, filter, and multi-question decisions | [GitHub](https://github.com/okooo5km/jev) |
+| `jev-browser` | Browser automation | Select one operation and target per browser step | [GitHub](https://github.com/jkudish/jev-browser) |
+
+## Jev RAG Reranking and Filtering
+
+Two of the most useful new projects focus on the stage before answer generation.
+
+[`jev-reranker`](https://github.com/hotchpotch/jev-reranker) provides Python methods for reranking search results and filtering retrieved documents with Jev. Its `rerank()` method orders candidates, while `relevance_rerank()` removes passages that do not contribute enough evidence according to a configurable threshold.
+
+The distinction matters in a RAG pipeline:
+
+| RAG stage | Conventional job | Jev project pattern |
+|---|---|---|
+| Retrieval | Find candidate passages | Existing search or hybrid retriever |
+| Reranking | Order candidates by usefulness | `rerank()` scores and sorts |
+| Filtering | Remove distracting or weak evidence | `relevance_rerank()` applies a threshold |
+| Generation | Write the answer | Separate generative model |
+| Verification | Check claims or citations | Jev or code-based citation checks |
+
+The project documents list splitting, concurrent requests, retries, synchronous and asynchronous methods, and optional diagnostic details. It also warns indirectly against a common mistake: passing every search hit to a generative model simply because it matched a query.
+
+The right lesson is not “Jev fixes RAG.” It is narrower: Jev can be placed between retrieval and generation when the application can define what useful evidence means. You still need to test thresholds, candidate ordering, domain coverage, and abstention behavior.
+
+## A Reproducible Jev RAG Benchmark
+
+[`jev-rag-benchmark`](https://github.com/erendikmenn/jev-rag-benchmark) is valuable because it starts from skepticism. Its README says that Jev may improve quality, latency, and cost, but that “Jev wins” is not assumed.
+
+The repository freezes candidate sets, separates retrieval from reranking and generation, records resolved model versions and usage, and distinguishes real API runs from fixtures. Its published XQuAD-TR snapshot reports that different Jev strategies behave differently:
+
+| Strategy | Reported result | Practical reading |
+|---|---|---|
+| Multi-signal evidence router | 93.00% answer threshold result | Can over-filter evidence and cost about twice as much in the reported run |
+| Full-corpus hierarchical Jev | 76.00% | Rejected as a replacement for the baseline retriever in that experiment |
+| Jev citation verification | 99.00% | Reported as a high-assurance mode with a small total-cost increase |
+
+These figures belong to the repository's Turkish XQuAD experiment. They are not universal Jev benchmarks, and the repository explicitly warns that Turkish results should not be generalized to other languages or domains without evaluation.
+
+This is exactly the kind of project Jev AI Guides should track: it shows how to measure a new model instead of assuming that a specialized classifier improves every pipeline.
+
+## Jev Sentinel for Coding-Agent Safety
+
+[`jev-sentinel`](https://github.com/harshwasan/jev-sentinel) puts Jev around coding-agent actions, tool outputs, and replies. The project supports Pi, Claude Code, and Codex CLI through different hooks.
+
+Its documented checks include:
+
+- Intent and risk before a tool call runs.
+- Prompt-injection or suspicious instructions in tool output.
+- Harmful content or relayed injection after an agent reply.
+- Optional task pinning to check whether an action remains on task.
+- Secret scrubbing before content is sent to Jev.
+- Fail-closed behavior when Jev errors or a key is missing.
+
+The project describes a two-question pattern: a Choice question for intent and a Score question for risk. Code then applies thresholds to decide whether to run, ask for approval, or warn.
+
+| Signal | Example policy described by the project |
+|---|---|
+| High risk score | Warn with Block highlighted |
+| Likely injected output | Warn and require approval for later actions |
+| Off-task action | Ask for user approval |
+| Clearly safe and on task | Allow according to the host's permission model |
+| Jev error or missing key | Do not auto-allow |
+
+This is an interesting Jev use case, but it is not a complete security boundary. The repository itself notes that Jev judges text, cannot fact-check the outside world, and does not solve prompt injection. Containers, tool permissions, sandboxing, and human confirmation remain necessary for untrusted code.
+
+## YouTube Sponsor Detection with Jev
+
+[`youtube-sponsor-detection`](https://github.com/trungdq88/youtube-sponsor-detection) turns Jev into a consumer browser tool. Its Chrome extension and local web app identify sponsor segments in YouTube videos and skip them.
+
+The design is especially instructive because code owns the time movement:
+
+| Mode | Input path | Jev's decision |
+|---|---|---|
+| Transcript | YouTube captions | Identify sponsor lines and segment boundaries |
+| Smart | Transcript plus targeted audio | Confirm whether a detected segment is a sponsor read |
+| Listen | Audio transcription while playing | Decide when the sponsor read is over |
+
+The README says transcript mode can work with a TypeSafe key alone, while Smart and Listen modes also use Deepgram. It documents cost estimates, confidence settings, caching, line-window scanning, and a rule that uncertain skips should favor watching extra content instead of cutting early.
+
+This is a strong example of a clean boundary: speech-to-text supplies text, Jev classifies the transcript lines, and code maps line IDs back to timestamps. Jev does not listen to raw audio or move the video on its own.
+
+## Semantic Code Linting with Perch
+
+[`perch`](https://github.com/lakeday-org/perch) applies Jev to code quality. Its README describes semantic code linting against custom rules, with findings that include line, severity, type, confidence, problem, and method.
+
+This is different from a parser or type checker. A conventional linter can prove syntax or pattern violations. A semantic linter can ask whether code appears to violate a project-specific rule such as “do not call this service directly from a UI component” or “this handler must preserve authorization checks.”
+
+| Check type | Better primary tool |
+|---|---|
+| Syntax validity | Parser or compiler |
+| Type mismatch | Type checker |
+| Formatting | Formatter |
+| Exact forbidden pattern | Deterministic linter |
+| Semantic project rule | Jev-assisted review plus code policy |
+
+The safe design is hybrid. Use deterministic checks when the rule can be expressed exactly, and use Jev for the semantic judgment that is difficult to encode. Findings should still be reviewed before they block a merge, especially while a rule is being calibrated.
+
+## The Jev CLI and Agent Skill
+
+[`okooo5km/jev`](https://github.com/okooo5km/jev) packages typed Jev decisions as a shell CLI and Agent Skill. Its commands include `yes`, `pick`, `score`, `filter`, `run`, and `raw`.
+
+This makes Jev easier to place into scripts and coding-agent workflows:
+
+| Command | Output shape | Example use |
+|---|---|---|
+| `yes` | Probability for a condition | Decide whether a ticket asks for a refund |
+| `pick` | One option from a set | Choose a handler or route |
+| `score` | Ordered score and label | Rate quality, urgency, or severity |
+| `filter` | Matching input lines | Keep logs or messages worth reviewing |
+| `run` | Several named answers | Classify one state in multiple ways |
+
+The README says the wrapper supports TypeSafe's API by default and OpenRouter as an alternative backend, and that it is not affiliated with either provider. That independence matters when assessing setup, pricing, model aliases, and security behavior.
+
+The CLI also exposes a reusable lesson for prompt design: Jev reads criteria literally. A question should describe observable conditions, cover the possible outcomes, and keep unrelated state out of the request.
+
+## Browser Automation Still Belongs on the List
+
+[`jkudish/jev-browser`](https://github.com/jkudish/jev-browser) remains one of the most practical Jev projects to study. It uses Jev to select one browser action per step and exposes MCP, CLI, and library interfaces.
+
+Its architecture matches the other projects:
+
+- Code observes and indexes browser elements.
+- Jev chooses one operation and compatible target.
+- Code validates freshness, permissions, budgets, and stop conditions.
+- The browser driver executes the action.
+- The tool returns a trace, final page, and screenshot.
+
+Browser automation and coding-agent safety look different, but they use the same model boundary: Jev chooses from a defined action space, while ordinary code owns side effects.
+
+## How to Evaluate New Jev Projects
+
+The number of repositories is growing fast, so a project directory should record more than a GitHub URL.
+
+| Field to record | Why it matters |
+|---|---|
+| Input state | Shows whether Jev receives text, JSON, transcripts, or extracted UI state |
+| Question type | Identifies whether the project uses Noul, Choice, or Score |
+| Action owner | Separates Jev's decision from code's side effect |
+| Fallback | Shows what happens on low confidence, errors, or empty results |
+| Evaluation method | Distinguishes fixtures, author tests, and independent benchmarks |
+| Secret handling | Important for agents, browser sessions, and API keys |
+| Reproducibility | A repository with scripts and fixed inputs is more useful than a video alone |
+
+The most promising Jev AI open source projects are not necessarily the ones with the biggest claims. They are the ones that expose their inputs, decision questions, thresholds, failures, and boundaries.
+
+## FAQ
+
+### What are the best Jev AI open source projects to study first?
+
+Start with `jev-reranker` for RAG, `jev-sentinel` for coding-agent safety, `youtube-sponsor-detection` for a user-facing browser tool, and `jev-browser` for action selection. Each shows a different boundary around the same typed decision model.
+
+### Can Jev replace a RAG retriever?
+
+The benchmark evidence does not support treating Jev as a universal replacement for retrieval. It is better understood as a reranker, evidence filter, or citation-verification stage after candidate retrieval, with quality and cost measured on the target dataset.
+
+### Is Jev Sentinel a complete prompt-injection defense?
+
+No. It adds an inspection and approval layer, but the project documents false alarms and limitations. Use it with sandboxing, least-privilege tools, secret controls, logs, and human review for consequential actions.
+
+### Can Jev analyze YouTube audio directly?
+
+The sponsor-detection project uses transcript or speech-to-text paths before Jev. Jev evaluates textual state and makes the classification; code and transcription tools handle audio, timestamps, and playback.
