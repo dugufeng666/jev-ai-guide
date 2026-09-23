@@ -1,0 +1,168 @@
+export const metadata = {
+  "title": "Jev AI GEO: Brand Mentions, Citations, and Visibility",
+  "description": "Learn how Jev AI supports GEO workflows by checking brand mentions, recommendation position, sentiment, citations, RAG evidence, and AI visibility.",
+  "category": "community",
+  "date": "2026-09-23",
+  "status": "draft"
+};
+
+## What Is Jev AI GEO?
+
+**Jev AI GEO** is the use of Jev for structured checks inside generative engine optimization workflows. Instead of asking a large model to write a long report about a brand's visibility, a GEO system can ask Jev focused questions:
+
+- Was the brand mentioned?
+- Where did it appear in the recommendation list?
+- Was the mention positive, neutral, or negative?
+- Did the answer cite the expected source?
+- Does the cited passage support the claim?
+- Is the answer consistent with the brand's approved facts?
+
+This is a natural fit for Jev because GEO monitoring produces repeated, bounded evaluations. A generative model may still answer the original user prompt or act as a broader judge, while Jev turns the response into comparable fields that code can store and aggregate.
+
+The clearest public implementation is [Notra](https://github.com/usenotra/notra), an open-source GEO platform. Its Jev integration evaluates brand-mention fields alongside its general judge and can classify whether a mention is present, where it appears, and how it is described. TypeSafe's official cookbooks provide related patterns for [RAG passage classification](https://docs.typesafe.ai/cookbooks/classifying_rag_passages.md) and [citation checking](https://docs.typesafe.ai/cookbooks/citation_check.md).
+
+| GEO signal | Jev-style output | Why it matters |
+|---|---|---|
+| Mention | Noul or boolean-like probability | Measures whether the brand appears at all |
+| Position | Choice or ordered score | Separates first recommendation from a late mention |
+| Sentiment | Choice | Distinguishes positive, neutral, and negative context |
+| Citation | Noul | Checks whether an answer includes a source or link |
+| Citation support | Noul or Score | Checks whether the source supports the claim |
+| Competitor presence | Choice or extracted labels | Enables share-of-voice and comparison analysis |
+
+## Brand Mention Evaluation with Notra
+
+Notra's GEO workflow shows how Jev can fit beside a conventional judge. A response from an AI engine may first be evaluated for overall quality, then a Jev classifier can refine specific mention fields such as sentiment, position, or brand-related interpretation.
+
+That separation is useful. A broad judge can describe an answer, but a metric system needs stable fields that can be compared across prompts, dates, models, and competitors. Jev can supply those fields when the question and criteria are explicit.
+
+| Measurement layer | Example question | Stored result |
+|---|---|---|
+| Presence | Does the answer mention the target brand? | `mentioned` probability or label |
+| Ranking | Is the target among the first three recommendations? | Position or top-three result |
+| Context | Is the mention positive, neutral, or negative? | Sentiment label |
+| Competition | Which alternatives are mentioned first? | Competitor list or position fields |
+| Evidence | Does the answer cite a source? | Citation presence |
+
+The Notra repository also makes an important engineering point: if Jev is unavailable, disabled, or returns an error, the application can retain the general judge's results. That means Jev can be introduced as a shadow evaluator before it becomes a hard dependency in the GEO pipeline.
+
+## GEO Metrics Need Stable Definitions
+
+A common GEO mistake is to calculate a metric before defining its unit. “Mention rate” can mean the percentage of prompts with at least one mention, the number of answer variants containing a mention, or the percentage of generated answers where an alias was found.
+
+Define the measurement before sending requests.
+
+| Metric | Suggested definition |
+|---|---|
+| Mention rate | Fraction of evaluated answers that mention the target or an approved alias |
+| Top-three rate | Fraction of answers where the target appears within the first three relevant recommendations |
+| Share of voice | Target mentions divided by target plus tracked competitor mentions under the same prompt set |
+| Sentiment rate | Fraction of mentions assigned to each sentiment class |
+| Citation rate | Fraction of answers containing a citation under a declared citation rule |
+| Citation support rate | Fraction of sampled claims whose cited source supports the claim |
+| Consistency | Agreement across repeated runs with the same prompt and source set |
+
+The exact formula is less important than keeping it fixed. If the definition changes halfway through a GEO experiment, an apparent improvement may only reflect a measurement change.
+
+Jev can help classify the answer fields, but ordinary code should count, group, deduplicate, and calculate rates. Do not ask Jev to perform arithmetic that the application can perform exactly.
+
+## Citation Verification and RAG Evidence
+
+Brand mentions are only one part of GEO. A strong answer should also be supported by sources that actually justify its claims. TypeSafe's citation-check cookbook describes a workflow where a claim and a context passage are evaluated for support, while code separately checks whether the cited URL exists.
+
+This creates a useful division of labor:
+
+| Step | Best component |
+|---|---|
+| Generate a draft answer | Generative model |
+| Extract claims and citation candidates | Code or generative extraction |
+| Judge whether context supports a claim | Jev |
+| Check URL status and retrieval | Ordinary code |
+| Decide whether to publish | Policy plus human review |
+
+The distinction between citation presence and citation support matters. An answer can include a real URL that does not support the sentence next to it. Conversely, a source may support the claim while the answer fails to cite it. GEO reporting should keep those failures separate.
+
+The [TypeSafe RAG cookbook](https://docs.typesafe.ai/cookbooks/classifying_rag_passages.md) adds another layer by evaluating passage relevance, contradiction, and prompt-injection risk before a model generates an answer. A Jev AI GEO pipeline can therefore score the evidence packet before generation, then check claim support afterward.
+
+## A Practical Jev AI GEO Workflow
+
+For a first GEO monitor, use a small frozen prompt set and a limited competitor list.
+
+1. Write prompts that represent real user questions.
+2. Record the answer, model, date, and retrieval context.
+3. Extract the target brand, aliases, competitors, claims, and cited URLs.
+4. Use Jev to classify mention, position, sentiment, and support fields.
+5. Use code to calculate rates and compare repeated runs.
+6. Send ambiguous or high-impact cases to review.
+7. Store the raw answer and decision fields so the metric can be audited.
+
+| Workflow object | Example fields |
+|---|---|
+| Prompt | Query text, market, language, date |
+| Answer | Raw text, model, provider, response ID |
+| Brand record | Canonical name, aliases, competitor set |
+| Mention result | Mentioned, position, sentiment, excerpt |
+| Citation record | URL, source title, claim, support decision |
+| Evaluation result | Jev model version, probabilities, confidence |
+| Review | Reviewer, reason, final decision, timestamp |
+
+Run the same prompt set repeatedly. A single answer is a snapshot, not a visibility trend. Generative answers can vary even when the prompt and brand remain unchanged, so GEO should be treated as a distribution over repeated observations.
+
+## Where Jev Helps and Where It Does Not
+
+Jev is useful when the output is a known field that the system can aggregate. It is less suitable when the task requires writing a strategy report, discovering new facts, or deciding whether a business claim is legally acceptable.
+
+| GEO task | Jev fit | Additional component |
+|---|---|---|
+| Detect a brand mention | Strong | Alias rules and exact counting code |
+| Classify mention sentiment | Strong | Human review for ambiguous context |
+| Rank recommendation position | Strong | Position definition and candidate extraction |
+| Check citation support | Strong | Source retrieval and URL validation |
+| Generate a GEO strategy | Poor | Generative model and human strategist |
+| Decide legal trademark risk | Poor | Legal review and policy |
+| Calculate rates and trends | Unnecessary | Ordinary code |
+| Discover every relevant search prompt | Partial | Research process and data sources |
+
+The model's typed result does not make the underlying judgement automatically correct. A wrong mention classification can still distort a dashboard, and a confident citation-support result can still be wrong when the context is incomplete.
+
+## Testing a GEO Classifier
+
+Before using Jev-derived GEO metrics in a report, create a labelled test set. Include cases that are easy to miss:
+
+- Exact brand names and approved aliases.
+- Similar company names and unrelated homonyms.
+- Mentions in negative or conditional language.
+- A brand appearing in a comparison but not as a recommendation.
+- A source link that exists but does not support the claim.
+- Multiple brands in one sentence.
+- Citations that refer to a general homepage instead of the relevant page.
+- Non-English answers and mixed-language aliases.
+
+| Test dimension | What to measure |
+|---|---|
+| Mention recall | How many true mentions are detected |
+| Mention precision | How many detected mentions are real |
+| Position accuracy | Whether first, top-three, and later positions are correct |
+| Sentiment agreement | Agreement with a human-labelled sample |
+| Citation support | Supported versus unsupported claim decisions |
+| Abstention quality | Whether ambiguous cases are routed to review |
+
+Do not hide uncertainty by turning every result into a single score. Preserve probabilities, criteria, raw excerpts, and review status so downstream users can distinguish a measured signal from a model judgement.
+
+## FAQ
+
+### What is Jev AI GEO used for?
+
+Jev AI GEO is used for structured evaluation of brand visibility in AI-generated answers. Common fields include mention presence, recommendation position, sentiment, competitor presence, citation presence, and citation support.
+
+### Can Jev measure Google rankings?
+
+Not directly. Jev can classify text or structured records supplied by an application. Traditional search rankings, clicks, impressions, and CTR should come from search data systems; Jev can help evaluate the content or AI-answer layer around those signals.
+
+### Can Jev verify a citation by itself?
+
+Jev can judge whether a supplied claim and context appear to support each other. Code should separately fetch or validate the cited URL, and a human should review ambiguous or high-impact claims.
+
+### Is one GEO run enough to measure visibility?
+
+No. AI answers vary across repeated runs, providers, prompts, languages, and dates. Use a frozen prompt set and repeated observations, then report the sampling method and uncertainty.
