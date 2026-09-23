@@ -1,0 +1,191 @@
+export const metadata = {
+  "title": "Jev AI Code Review: MCP Scores for Coding Agents",
+  "description": "Learn how Jev AI code review tools score diffs, prioritize risky changes, and guide coding agents through focused review loops without generating fake explanations.",
+  "category": "agent",
+  "date": "2026-09-23",
+  "status": "draft"
+};
+
+## What Is Jev AI Code Review?
+
+**Jev AI code review** uses typed decisions to evaluate a change set, prioritize attention, or score bounded quality dimensions. It does not need to write a long review essay. Instead, an MCP server or local tool sends a focused diff and context to Jev, reads structured results, and lets the coding agent inspect the evidence before making a change.
+
+That division is important:
+
+- Jev evaluates the questions the application declares.
+- The coding agent investigates the source and decides what to edit.
+- Deterministic checks such as tests, type checking, secret scans, and permissions remain in code.
+- A human reviews high-impact or uncertain changes.
+
+Recent community projects show two complementary patterns:
+
+- [Jev Review](https://github.com/NiazMorshed2007/jev-review) is a local MCP server that gives Claude Code, Codex, Cursor, and OpenCode structured quality signals.
+- [Jev-Reviewer](https://github.com/egma-ai/jev-reviewer) uses Jev to prioritize attention on changed files and presents behavioral comparisons inside GitHub's pull request view.
+
+The common idea is not “let a model approve every pull request.” It is “use a fast decision layer to spend human and agent attention where it is most useful.”
+
+| Review problem | Jev's bounded role | Deterministic follow-up |
+|---|---|---|
+| Which changed files deserve attention first? | Assign a review priority | Inspect every file and enforce required paths |
+| Is the change risky in a specific dimension? | Score security, tests, complexity, or compatibility | Run tests, scanners, and deployment checks |
+| Did behavior change in an important way? | Select the relevant behavior category | Compare old and new code and verify fixtures |
+| Should the agent rescore its work? | Compare focused evaluation results | Confirm the code actually improved |
+| Is a change ready for a human handoff? | Classify attention or uncertainty | Require the project’s release checklist |
+
+## Why Use Jev Instead of a Generative Review?
+
+A generative model can produce a useful explanation, but an unconstrained paragraph is awkward to route through software. It may mix several issues, invent a file reference, or bury a security concern in prose.
+
+Jev's Choice, Score, and Noul outputs are easier to connect to a review policy:
+
+| Question type | Example review question | Application response |
+|---|---|---|
+| Choice | Which attention level fits this diff? | Open P0 files, collapse P1, group P2 |
+| Score | How strong is the test coverage for this change? | Ask the agent to inspect missing paths |
+| Noul | Does this change introduce a permission-sensitive behavior? | Require human review and a security check |
+
+This does not make the judgment correct by definition. A typed answer can still be wrong, and a high score is not a proof that the code works. The advantage is that the result is explicit, bounded, and available to ordinary application logic.
+
+For explanations, a separate generative model can turn the inspected evidence into a readable review note. The review system should keep that explanation separate from the Jev decision, so a polished paragraph cannot override a failed test or a required approval.
+
+## Jev Review as a Local MCP Loop
+
+[Jev Review](https://github.com/NiazMorshed2007/jev-review) describes a local-first workflow for continuous software-quality evaluation. The coding agent sends a focused task, diff, selected files, or repository context to one MCP tool. Jev returns structured signals across dimensions such as correctness, complexity, changeability, modularity, tests, and security.
+
+The project reports support for:
+
+- Claude Code
+- Codex
+- Cursor
+- OpenCode
+
+The server runs locally over MCP stdio, and the project says the API key remains on the developer's machine. Its documented flow is iterative:
+
+1. Implement one coherent change.
+2. Run the relevant tests and checks.
+3. Send a focused diff and context for a baseline evaluation.
+4. Inspect the weakest important dimension.
+5. Make the smallest justified improvement.
+6. Run the checks again.
+7. Rescore only when another evidence-based improvement is worth testing.
+
+The tool intentionally does not make the primary coding agent obey a generated prose review. Jev supplies signals, while the agent must identify the cause and choose the code change. That boundary makes the workflow more auditable than an automatic “fix everything” command.
+
+| Review input | Better than sending | Why |
+|---|---|---|
+| Focused diff | Entire repository | Keeps the evaluation tied to the change |
+| Relevant files | Every generated artifact | Reduces unrelated context |
+| Task and acceptance criteria | A vague “is this good?” | Gives the questions a clear target |
+| Previous evaluation | A fresh score with no history | Shows whether a specific change helped |
+
+## GitHub PR Review with Behavioral Priorities
+
+[Jev-Reviewer](https://github.com/egma-ai/jev-reviewer) takes a different route. It compares old and new behavior for changed files, asks what deserves human attention, and displays priorities in a local GitHub extension.
+
+Its model is useful for pull requests where a line-by-line diff is technically correct but hard to scan. A reviewer may need to know:
+
+- What behavior did this file have before?
+- What behavior does it have now?
+- Which assumption needs a human decision?
+- Is the change security-sensitive, destructive, or contract-breaking?
+
+The project defines attention levels such as P0, P1, and P2. Those labels are review priorities, not guaranteed bug severities. A P0 means human judgment is required under the configured policy; it does not prove that the code contains a defect.
+
+The extension also keeps the original GitHub code view available. If a report is stale, incomplete, or unverifiable, native code remains visible. This is a good design principle for AI-assisted review: when analysis fails, degrade to the ordinary review surface instead of replacing it with confident-looking output.
+
+| Situation | Recommended behavior |
+|---|---|
+| Security or permission change | Expand for human review |
+| Bounded behavior change with tests | Show a focused summary and keep the diff available |
+| Mechanical rename with passing checks | Lower attention, but preserve traceability |
+| Missing context or stale report | Do not replace the native diff |
+| Large pull request | Split into coherent review units |
+
+## A Practical Jev AI Code Review Architecture
+
+A useful implementation separates four layers:
+
+### 1. Context collection
+
+The host application chooses the state sent to Jev. That may include a diff, task description, changed file paths, selected source windows, test results, and repository policy. It should not blindly upload secrets, ignored files, or an entire private repository.
+
+### 2. Typed evaluation
+
+The application asks narrow questions. Examples:
+
+- Is this change permission-sensitive?
+- Does the diff modify a public API contract?
+- Is the test evidence sufficient for the stated behavior?
+- Which review dimension should the agent inspect first?
+
+Independent questions can be evaluated together when they share the same state. The application should keep question wording, option lists, model ID, and thresholds versioned.
+
+### 3. Evidence inspection
+
+Jev should point the workflow toward evidence, not replace it. The agent can open the relevant files, inspect the old and new code, search references, and run tests. If the returned decision says “security risk,” the next step is not automatically to rewrite the code. The next step is to identify the exact permission path, input boundary, or authorization contract.
+
+### 4. Policy and handoff
+
+The final result should map to an action band:
+
+| Action band | Example |
+|---|---|
+| Continue | Run another focused check |
+| Ask agent to inspect | Investigate a low test or compatibility score |
+| Human review | Security, permissions, data loss, or public contract |
+| Block | Failed deterministic check or forbidden path |
+
+The action band belongs to application policy. Jev returns evidence for that policy; it should not be the sole authority for a destructive operation or production deployment.
+
+## How to Keep Reviews Reliable
+
+The strongest implementation habits are simple:
+
+- Use exact tools for exact facts. A compiler should decide whether TypeScript parses.
+- Use Jev for bounded semantic questions that are difficult to express with a regular rule.
+- Keep the diff focused and split large changes into review slices.
+- Include the task and acceptance criteria so the evaluation has a reference point.
+- Store the question set and thresholds with the project.
+- Compare scores by dimension instead of hiding everything in one overall number.
+- Re-run tests after every agent edit.
+- Treat low confidence and conflicting signals as reasons to inspect, not as permission to guess.
+- Keep API keys and source context under the project's privacy policy.
+
+The README for Jev Review explicitly says that its results are not a replacement for the coding agent's diagnosis. That is the right mental model for most teams: Jev can prioritize and measure a review loop, but tests and humans still determine whether the change is acceptable.
+
+## Limits and Safety Boundaries
+
+Jev AI code review has several limits that matter in production:
+
+| Limit | Safer response |
+|---|---|
+| A score can be wrong | Calibrate on labeled changes and keep deterministic gates |
+| A semantic review can miss cross-file behavior | Run tests, reference searches, and integration checks |
+| Source context may leave the machine | Redact secrets and define allowed paths |
+| Large diffs create weak context | Split by feature or behavior |
+| A review report can become stale | Bind reports to exact commits |
+| A high priority is not proof of a bug | Ask for evidence before editing |
+
+Do not use Jev alone to approve a database migration, grant privileges, delete data, ship an authentication change, or execute a shell command. A review classifier can help choose the next check, but the final authorization should remain in deterministic policy and human approval where the impact is high.
+
+## FAQ
+
+### What is Jev AI code review?
+
+Jev AI code review is a workflow where Jev evaluates bounded questions about a diff or code context and returns typed scores, choices, or probabilities. The coding agent and project checks handle investigation and verification.
+
+### Can Jev write the code review explanation?
+
+Not by itself in the usual Jev workflow. Jev returns typed decisions rather than a free-form review essay. A separate generative model can explain verified evidence after the decision layer identifies what deserves attention.
+
+### Does Jev replace tests or static analysis?
+
+No. Tests, compilers, linters, secret scanners, and permission checks are better suited to deterministic facts. Jev is useful for semantic prioritization and bounded judgments that are harder to encode with a fixed rule.
+
+### Is Jev AI code review safe for private repositories?
+
+It depends on the tool, provider, and configuration. Local-first projects can reduce extra infrastructure, but source context may still be sent to the configured Jev provider. Review the repository's privacy requirements, redact secrets, and limit the files included in each request.
+
+### Should every low Jev score block a pull request?
+
+No. A score is a signal whose meaning depends on the rubric and the cost of being wrong. Block on deterministic failures and configured high-risk policies; use uncertain semantic results to trigger inspection or human review.
