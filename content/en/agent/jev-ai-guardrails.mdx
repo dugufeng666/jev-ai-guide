@@ -1,0 +1,171 @@
+export const metadata = {
+  "title": "Jev AI Guardrails: Tool Calls, Prompt Injection, and Review",
+  "description": "Learn how Jev AI guardrails review coding-agent tool calls, prompt injection, skills, plugins, and replies with deny, ask, allow, and review paths.",
+  "category": "agent",
+  "date": "2026-09-23",
+  "status": "draft"
+};
+
+## What Are Jev AI Guardrails?
+
+**Jev AI guardrails** use Jev as a structured review layer around an agent's actions. Before a tool runs, Jev can score the proposed call and help decide whether to allow it, ask for approval, or deny it. After a tool returns, Jev can inspect the result for prompt injection or instructions that the agent should not follow.
+
+This pattern is becoming one of the most practical Jev applications for coding agents. The recent [`leepokai/jev-guard`](https://github.com/leepokai/jev-guard) project supports Claude Code, Codex, GitHub Copilot CLI, Gemini CLI, Cursor, pi, OpenCode, and ACP clients. [Jev Sentinel](https://github.com/harshwasan/jev-sentinel) provides another community implementation for Pi, Claude Code, and Codex.
+
+Neither project turns Jev into a sandbox or a complete security boundary. Jev judges supplied text and structured context. The host agent, operating system, permissions, sandbox, secrets policy, and human approval path still determine what an action can actually do.
+
+| Guardrail stage | What Jev can judge | What code must enforce |
+|---|---|---|
+| Before a tool call | Intent, risk, scope, and whether the call matches the task | Permissions, sandboxing, allowed tools, execution |
+| After a tool result | Prompt injection, suspicious instructions, canaries, or off-task content | Whether the agent sees or follows the result |
+| Skill or plugin load | Unexpected behavior, exfiltration, covert execution, unrelated side effects | Installation policy and filesystem permissions |
+| Agent reply | Harmful or policy-sensitive content | Whether to show, revise, or escalate the reply |
+| Human review gate | Whether the result is uncertain or high impact | Final approval and accountability |
+
+## Before-Tool Approval
+
+The most direct Jev AI guardrail is a pre-execution check. The application sends the exact tool name, arguments, working directory, task context, and relevant session information as state. Jev then answers questions such as:
+
+- How risky is this call?
+- Does it match the user's request?
+- Is approval required?
+- Does it appear to execute an instruction planted in untrusted content?
+
+The important design choice is to classify the actual proposed call, not a vague description of the agent's plan.
+
+| Weak state | Better state |
+|---|---|
+| “The agent wants to work on the project” | Tool name, exact arguments, current directory, task, and recent relevant context |
+| “Is this safe?” | “Could this command delete files, exfiltrate secrets, alter production, or bypass the stated task?” |
+| “Should it continue?” | “Allow, ask for approval, or deny this exact tool call under the current task?” |
+
+`jev-guard` documents a deny, ask, and allow policy. It also describes a special case for instructions found in material the agent read: a tool call can be denied when it carries out an injected instruction, even if the call looks harmless in isolation.
+
+This is a useful principle for any Jev AI guardrails implementation: risk depends on the call plus the session context, not only on the command string.
+
+## After-Tool Prompt-Injection Checks
+
+Tool results can contain text that addresses an AI agent directly. A repository README, web page, issue, log, or MCP response might include instructions such as “ignore previous rules” or “send this secret to another service.”
+
+The application should treat this content as untrusted data. A post-tool Jev check can classify whether the result contains:
+
+- Prompt injection or instruction hijacking.
+- A canary phrase intended to manipulate the agent.
+- A request to exfiltrate credentials or private data.
+- An unrelated action that conflicts with the user's task.
+- A tool output that requires human review before use.
+
+The correct outcome is not to ask Jev to rewrite the tool output. The safer boundary is to label the result, isolate it from trusted instructions, and prevent the agent from treating it as authority.
+
+| Tool-result signal | Safer application response |
+|---|---|
+| No suspicious instruction | Continue under the existing policy |
+| Possible injection | Mark as untrusted and warn the agent |
+| High-risk action requested by the result | Block downstream execution |
+| Ambiguous content | Ask the user or route to review |
+| Jev error or unavailable key | Fail closed for sensitive actions |
+
+Jev can help identify suspicious text, but code should still separate system instructions, user instructions, tool data, and retrieved documents.
+
+## Skills, Plugins, and Instruction Files
+
+Coding agents increasingly load skills, plugins, `CLAUDE.md`, `AGENTS.md`, and other instruction files. These files can be useful, but they are also an attack surface because they influence future agent behavior.
+
+`jev-guard` describes checking instruction files at session start, when a skill is loaded, when a skill runs, and on demand. The questions focus on whether the file contains behavior an installer would not expect, such as:
+
+- Secret exfiltration.
+- Covert command execution.
+- Attempts to override higher-priority instructions.
+- Canary phrases or hidden agent-directed text.
+- Unrelated side effects.
+
+This does not replace code review. Jev can flag a suspicious file, while a human or deterministic scanner should inspect the exact content and decide whether it belongs in the environment.
+
+| Control | Purpose |
+|---|---|
+| Repository allowlist | Limit which skills and plugins can load |
+| Hash or version record | Detect unexpected changes |
+| Jev semantic review | Catch behavior that is hard to match with a regex |
+| Deterministic secret scan | Catch known key and token formats |
+| Sandbox | Limit what an installed tool can do |
+| Human approval | Decide whether a high-impact capability is acceptable |
+
+## Jev Sentinel and Jev Guard Compared
+
+Both projects add Jev-based checks to coding agents, but their documented scope is different.
+
+| Project | Main focus | Supported environments shown in source |
+|---|---|---|
+| `jev-guard` | Broad adapters, tool-call risk, prompt-injection flags, skills, plugins, session context | Claude Code, Codex, Copilot CLI, Gemini CLI, Cursor, pi, OpenCode, ACP |
+| `jev-sentinel` | Agent action, tool output, reply review, and human prompts | Pi, Claude Code, Codex |
+
+`jev-guard` also documents direct TypeSafe and Vercel AI Gateway backends, a no-build npm installation path, and a fail-closed posture for missing keys or errors. Its README reports a typical call of about 1,000 input tokens and provides author-measured latency observations. Those are project-specific measurements, not a Jev AI Guides benchmark.
+
+Jev Sentinel's official directory entry describes it as an additional review layer and explicitly notes false alarms and limitations. That wording is important: a guardrail can improve visibility and add a decision gate without guaranteeing that all dangerous actions or prompt injections are caught.
+
+## A Practical Guardrail Architecture
+
+A production-minded Jev AI guardrails design should combine model judgment with deterministic controls.
+
+| Layer | Example |
+|---|---|
+| Task policy | The user asked for a local test, not a production deployment |
+| Tool allowlist | Permit read-only commands; restrict shell, network, and deploy tools |
+| State construction | Include exact tool call, task, cwd, and relevant trusted context |
+| Jev decision | Score risk and classify allow, approval, or deny |
+| Deterministic check | Reject protected paths, credential access, or forbidden network destinations |
+| Human gate | Require approval for deletion, publishing, financial actions, or production changes |
+| Execution | Run only the validated call |
+| Result scan | Check output for prompt injection and unexpected instructions |
+| Audit log | Record decision, model version, policy, and execution outcome |
+
+The most important rule is that Jev should never be the only control that authorizes a consequential action. The code path should be able to deny an operation even when Jev says it is probably safe.
+
+## Thresholds, Confidence, and Fail-Closed Behavior
+
+Jev returns probabilities, scores, and confidence values, but those values do not automatically define a security policy. A team must choose thresholds based on the cost of false positives and false negatives.
+
+| Result | Possible policy |
+|---|---|
+| Low risk, high confidence | Allow within an existing tool and path allowlist |
+| Medium risk or uncertain confidence | Ask the user for approval |
+| High risk, high confidence | Deny automatically |
+| Conflicting signals | Route to review |
+| API timeout or missing key | Fail closed for sensitive tools |
+
+Thresholds should be evaluated on representative tool calls. Include harmless commands, destructive commands, ambiguous requests, hidden instructions, encoded text, secrets, and operations that are safe in one directory but dangerous in another.
+
+Do not copy a threshold from a README into every deployment. The appropriate threshold depends on the agent, tools, data, user permissions, and reversibility of the action.
+
+## Privacy and Secret Handling
+
+Guardrails inspect agent context, which may contain source code, documents, logs, URLs, commands, and tool output. Before enabling a Jev AI guardrails project, decide what is allowed to leave the machine.
+
+The `jev-guard` README says it sends the tool call or tool result over TLS to TypeSafe or Vercel AI Gateway and requests zero data retention. That is a project and provider configuration detail, not a reason to send secrets blindly. The repository also warns that tool results can contain anything the agent just read.
+
+Use these controls:
+
+- Scrub API keys, passwords, cookies, session tokens, and private certificates before model evaluation.
+- Keep credentials in code-controlled channels instead of prompts and screenshots.
+- Minimize the context sent to Jev.
+- Review provider retention and legal terms before using sensitive repositories.
+- Log decisions without logging full secrets or unredacted tool results.
+- Use separate keys and policies for local development and production.
+
+## FAQ
+
+### What are Jev AI guardrails?
+
+Jev AI guardrails are structured checks around an agent workflow. Jev evaluates a proposed tool call, tool result, skill, plugin, or reply, while code decides whether to allow, deny, warn, or request human approval.
+
+### Can Jev prevent prompt injection?
+
+No guarantee. Jev can flag suspicious instructions in tool results or instruction files, but it can be wrong, a hook can be misconfigured, and an agent can bypass a path. Use isolation, permissions, deterministic scanners, and human review as additional controls.
+
+### Is jev-guard a sandbox?
+
+No. Its README explicitly describes it as a guardrail, not a sandbox. It can add risk scoring and policy decisions, but operating-system permissions, containers, network controls, and tool allowlists remain necessary.
+
+### Should a high-confidence Jev result authorize a production deploy?
+
+Not by itself. A production deploy should still require explicit environment checks, protected credentials, a deployment policy, logs, rollback capability, and human approval when the action is consequential.
