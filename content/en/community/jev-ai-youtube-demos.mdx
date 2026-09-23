@@ -1,0 +1,120 @@
+export const metadata = {
+  "title": "Jev AI YouTube Demos: What to Watch and Verify",
+  "description": "Use this Jev AI YouTube demo guide to track community videos, browser agents, integrations, game demos, use cases, and the evidence to verify.",
+  "category": "community",
+  "date": "2026-09-23",
+  "status": "draft"
+};
+
+## Why Jev AI YouTube Demos Matter
+
+The number of **Jev AI YouTube** explainers and demo clips is rising quickly because Jev is easier to demonstrate visually than to describe abstractly. A creator can show a browser agent choosing a button, a support router classifying a ticket, or a game loop selecting the next action, then explain that Jev is making bounded decisions instead of writing text.
+
+That visual format is useful, but it can also blur the boundary between what Jev actually does and what the surrounding application does. Jev does not directly process raw video, audio, screenshots, or binary files. The official model documentation says the model accepts text, JSON objects, or arrays of text values as state, so every media-heavy demo should be understood as a pipeline: another system converts the environment into structured text, Jev evaluates the decision, and code executes the action.
+
+This page tracks the kinds of community videos worth watching and the questions to ask before treating a demo as technical evidence.
+
+| Video or demo type | What viewers usually see | What Jev likely decides |
+|---|---|---|
+| Browser agent demo | Pages opening, buttons clicked, forms filled | Which operation and page element to choose next |
+| Support or routing tutorial | A ticket or message classified into categories | Department, urgency, risk, or frustration score |
+| Integration walkthrough | AI SDK, Cloudflare, LangChain, or TypeSafe calls | Typed Choice, Score, or Noul answers |
+| Game or simulation demo | Fast repeated actions in a loop | One action from a predefined action set |
+| Comparison video | Jev compared with Claude, GPT, or normal code | Whether the task is bounded enough for Jev |
+
+## YouTube Videos Worth Tracking
+
+The videos below are useful as community context. Treat them as explainers, demos, or test-case inspiration rather than controlled benchmarks.
+
+| Video | Why it is useful | Evidence level |
+|---|---|---|
+| [Community Jev explainer](https://www.youtube.com/watch?v=47-u2is2fYA) | Frames Jev as the middle layer between deterministic code and generative LLMs | Useful architecture explanation |
+| [Jev comparison video](https://www.youtube.com/watch?v=D4a3ip-S8OM) | Shows interest in comparing Jev against generative models on bounded decision tasks | Useful test-case inspiration |
+| [Jev video result surfaced in community search](https://www.youtube.com/watch?v=vj7hysh0mOI) | Appears in current community video discovery around Jev and TypeSafe | Watchlist item; verify details before citing claims |
+
+When adding a YouTube source to a production article, verify the title, creator, upload date, and whether the video links to code, docs, or reproducible inputs. A polished screen recording is not the same as a reproducible benchmark.
+
+## What to Extract from a Jev Demo
+
+The most useful Jev AI YouTube videos are not the ones with the most dramatic title. They are the ones that disclose the decision boundary clearly.
+
+| Verification question | Why it matters |
+|---|---|
+| What was the state sent to Jev? | Determines whether Jev saw text, JSON, or a preprocessed summary |
+| What were the allowed choices or criteria? | Shows whether the output space was bounded |
+| Was a generative model also used? | Separates writing and planning from Jev's decision role |
+| What code executed the action? | Jev returns a signal; software performs the click, route, or approval |
+| Were failures shown? | One successful clip does not establish reliability |
+| Are timing and cost measurements disclosed? | Prevents creator-reported claims from becoming false benchmarks |
+| Is there a repository or docs link? | Makes the demo easier to reproduce or audit |
+
+For example, a browser-control video may look like Jev is “using the web.” The stronger technical description is narrower: the page is transformed into a list of candidate operations and elements, then Jev chooses among those candidates. That is still valuable, but it is different from claiming that Jev sees and understands a web page the way a vision model might.
+
+## Use Case Patterns Behind the Video Surge
+
+Most new Jev demos fall into the same architecture:
+
+1. A conventional system collects state from a webpage, ticket, app event, game, or document.
+2. A developer writes typed questions with known outputs.
+3. Jev returns a Choice, Score, or Noul answer with probabilities or confidence.
+4. Application code executes the branch, sends the item to review, or calls another tool.
+5. A human review path remains for consequential or ambiguous cases.
+
+This is why Jev appears in so many different examples. The model is not replacing every part of an application. It is replacing a common pattern where developers previously asked a generative model to return a category, then parsed the text or JSON afterward.
+
+| Pattern | Example workflow | Why it fits Jev |
+|---|---|---|
+| Classification | Route support tickets by department | Output is one category from a defined set |
+| Filtering | Keep only RAG passages that support an answer | Output is a decision about relevance or risk |
+| Scoring | Rate frustration, risk, or quality | Output is an ordered value |
+| Selection | Choose a browser element or agent skill | Output is one item from candidates |
+| Guardrails | Review a tool call before execution | Output is a permit, caution, or review signal |
+
+The best community videos make that decomposition visible. Weak videos hide the state, choices, criteria, or code path and present the result as if the model performed the whole workflow alone.
+
+## YouTube Claim Checklist
+
+Before turning a viral Jev video into site content, use this checklist.
+
+| Claim in a video | Safer site wording |
+|---|---|
+| “Jev controls a browser” | “Jev can choose among browser actions prepared by the automation layer” |
+| “Jev sees the game” | “A state extractor supplies text or structured game state to Jev” |
+| “Jev replaces ChatGPT” | “Jev replaces some bounded decision steps, not open-ended writing” |
+| “Jev is 200x faster” | “TypeSafe and LangChain report large speed gains on classification workloads” |
+| “Jev makes agents safe” | “Jev can add a pre-execution classifier, but permissions and review still belong in code” |
+| “Jev can handle any input” | “Jev 1.13 accepts textual state, not raw images, audio, video, or binaries” |
+
+This wording keeps the excitement while protecting the page from overclaiming. It also gives developers a clearer mental model: Jev is a decision layer, not a universal replacement for tools, code, and generative models.
+
+## Recommended Content Actions
+
+For Jev AI Guides, the best response to the YouTube surge is not to embed every video. A stronger content plan is to convert video themes into source-backed pages.
+
+| Theme from videos | Best page type |
+|---|---|
+| Browser automation demos | Browser agent case study with DOM/action-candidate explanation |
+| Tool-call safety demos | Agent guardrails tutorial |
+| “Jev vs LLM” videos | Comparison article with bounded-task examples |
+| “How to use Jev” tutorials | Integration guide for AI SDK, Cloudflare, LangChain, or TypeSafe |
+| Game or simulation clips | Demo-verification checklist, not a production-readiness claim |
+
+Use video clips as discovery signals, then back each article with official docs, repositories, code samples, or reproducible inputs. That combination is more durable for SEO than chasing every creator title.
+
+## FAQ
+
+### Can Jev AI process YouTube videos directly?
+
+No. Jev 1.13 accepts text, JSON objects, or arrays of text values as state. A YouTube or screen-recording workflow would need another system to extract transcript, labels, actions, or structured context before Jev can evaluate it.
+
+### Are Jev AI YouTube demos proof of production performance?
+
+Not by themselves. A Jev AI YouTube demo can show a possible workflow, but production performance requires disclosed inputs, criteria, run counts, failure cases, timing method, and application safeguards.
+
+### What Jev AI demos are most useful to study?
+
+The best demos show a bounded decision: support routing, browser action selection, RAG filtering, citation checking, tool-call review, or model routing. Those map naturally to Choice, Score, or Noul questions.
+
+### Should a Jev video be embedded on every article?
+
+No. Use videos where they help the reader understand a workflow. For reference articles, source-backed tables and links to official docs or repositories are usually more useful than a video embed alone.
