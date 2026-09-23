@@ -1,0 +1,200 @@
+export const metadata = {
+  "title": "Jev AI Email Triage: Gmail, IMAP, and Support Tickets",
+  "description": "Explore Jev AI email triage workflows for Gmail inbox sorting, IMAP classifiers, support-ticket routing, confidence gates, and human escalation.",
+  "category": "community",
+  "date": "2026-09-23",
+  "status": "draft"
+};
+
+## What Is Jev AI Email Triage?
+
+**Jev AI email triage** uses Jev to sort messages into bounded categories, score urgency, and decide when a human should review the result. It is a strong fit because inbox and support workflows are mostly routing problems, not writing problems.
+
+Instead of asking a chatbot to summarize an inbox, a Jev-based triage system asks typed questions:
+
+- Which tray should this message go into?
+- How urgent is it?
+- Was it written by a human who expects a reply?
+- Which support team owns this ticket?
+- Is the sender angry or at risk of churn?
+- Should this item be escalated instead of auto-routed?
+
+The application then uses ordinary code to display, label, queue, or escalate the item. Jev does not need to generate the reply. A separate writing model, template, or human can handle the response after triage.
+
+Recent community projects show this pattern from several angles:
+
+- [Jevmail](https://github.com/fazlerocks/jevmail) sorts Gmail into trays with urgency scoring through Vercel AI Gateway.
+- [Jev Support Ticket Router](https://github.com/Zafer-Liu/jev-demo-router/blob/main/README.md) routes support tickets with department, urgency, and anger questions in one call.
+- [jev-mail-classifier](https://github.com/parth-kp/jev-mail-classifier) focuses on IMAP inbox classification and config-driven actions.
+- [Jev vs LLMs support-ticket triage](https://github.com/BUNYOD0987/jev-vs-llm) compares Jev with two language models on a small labeled ticket set.
+
+| Workflow | Best Jev role | Human or code role |
+|---|---|---|
+| Gmail inbox zero | Tray choice, urgency score, human-written probability | Read, archive, reply, or correct labels |
+| Support ticket routing | Department choice, urgency, anger score | Dispatch, SLA policy, refund authority |
+| IMAP rules | Tag, move, flag, notify decisions | Mailbox actions and audit trail |
+| Benchmarking | Same typed questions across models | Label set, scoring, error analysis |
+
+## Why Email Is a Good Jev Use Case
+
+Email has many closed-set decisions. Most systems do not need a new paragraph for every incoming message; they need a reliable classification that downstream code can act on.
+
+| Email question | Jev primitive | Example options |
+|---|---|---|
+| Which inbox tray? | Choice | Needs reply, Updates, Promos, Sales, Spam |
+| How urgent? | Score | 1 to 5 urgency scale |
+| Is a real person asking for help? | Noul | Probability of yes |
+| Which team owns this ticket? | Choice | Billing, Technical, Account, Sales |
+| How angry is the customer? | Score | Calm, Frustrated, Escalated |
+
+This structure solves two common problems in LLM-based inbox tools:
+
+1. The output schema is bounded by the application.
+2. The program can route on probabilities instead of parsing an essay.
+
+A good triage tool should still keep corrections. When users move a message to another tray, that correction becomes a useful audit record and a future evaluation example.
+
+## Jevmail: Gmail Triage Through Vercel AI Gateway
+
+[Jevmail](https://github.com/fazlerocks/jevmail) is an open-source Gmail triage app. It describes a read-only, local workflow where messages are sorted into five trays:
+
+| Tray | Typical messages |
+|---|---|
+| Needs reply | Personal or work messages that expect action |
+| Updates | Bank alerts, deliveries, receipts, OTPs |
+| Promos | Marketing and newsletters |
+| Sales | Sales outreach and business development |
+| Spam | Low-value or unwanted messages |
+
+The project asks three questions per email: tray, urgency, and whether a human wrote it. It uses `typesafe-ai/jev` through Vercel AI Gateway and stores results with probabilities. The README also says the app requests Gmail's `gmail.readonly` scope, which means it cannot mark mail read, archive, label, report spam, or send messages through that OAuth grant.
+
+That read-only design is exactly the right starting point for an inbox product. Users can evaluate the classification quality without handing the tool write permission on day one.
+
+| Design choice | Why it helps |
+|---|---|
+| Read-only Gmail scope | Reduces accidental mailbox mutation |
+| Fixed tray set | Prevents invented labels |
+| Urgency score | Lets the UI sort within a tray |
+| Human-written probability | Separates automated notices from reply-worthy mail |
+| Stored corrections | Creates an audit trail for evaluation |
+
+If you build a similar workflow, start with a local or read-only pilot. Add write actions only after the user trusts the tray quality and the product has a clear undo path.
+
+## Support Ticket Routing with Confidence Gates
+
+[Jev Support Ticket Router](https://github.com/Zafer-Liu/jev-demo-router/blob/main/README.md) demonstrates a classic customer-support pipeline. Each ticket goes through a single Jev call with three questions:
+
+1. Which department owns it?
+2. Is it urgent?
+3. How angry is the customer?
+
+The project uses a confidence gate: above the configured threshold, the ticket can be dispatched; below it, the item goes to a human queue. That is the key product lesson. The goal is not to automate every ambiguous ticket. The goal is to automate the obvious cases and surface uncertain ones before they cause silent errors.
+
+| Signal | Possible routing action |
+|---|---|
+| High department confidence and low anger | Auto-dispatch to the team queue |
+| High urgency or high anger | Escalate or apply SLA priority |
+| Low confidence | Human triage |
+| Billing plus refund language | Require policy check |
+| Technical outage plus many similar tickets | Incident workflow |
+
+For multilingual inboxes, the router claims English and Chinese support. Treat that as a useful project claim, not a blanket guarantee. If your support volume is multilingual, build a labeled sample set in each language and measure confusion between departments, urgency, and anger levels.
+
+## IMAP Classification and Config-Driven Actions
+
+[jev-mail-classifier](https://github.com/parth-kp/jev-mail-classifier) takes a more traditional email-client route. It focuses on IMAP setup, provider configuration, and config-driven actions such as tagging, moving, flagging, and notifying.
+
+That shape is useful when you do not want to build around Gmail OAuth only. IMAP can cover Gmail, Outlook, Microsoft 365, and other mailboxes, but the setup introduces its own operational details:
+
+- IMAP must be enabled by the user.
+- Accounts with two-factor authentication may need app passwords.
+- The tool needs safe credential storage.
+- Write actions need an undo or audit path.
+- Provider-specific limits and folder behavior can differ.
+
+The safest sequence is:
+
+1. Fetch a small batch in read-only or dry-run mode.
+2. Classify without mutating the mailbox.
+3. Show proposed actions and probabilities.
+4. Let the user correct results.
+5. Enable limited write actions only after review.
+
+This makes Jev an assistant to mailbox policy, not an invisible mail robot.
+
+## Benchmarking Jev Against LLM Classifiers
+
+[Jev vs LLMs: support-ticket triage](https://github.com/BUNYOD0987/jev-vs-llm) compares Jev with two language models on 30 hand-labeled support tickets. The benchmark asks the same three questions for each ticket: department, urgency, and anger.
+
+The repository reports the raw requests and a small result table. It is useful because it models how teams should evaluate this class of product:
+
+| Benchmark asset | Why it matters |
+|---|---|
+| Labeled tickets | Gives the system a target instead of vibes |
+| Same questions for each model | Makes comparisons more meaningful |
+| Latency and cost columns | Shows operational tradeoffs |
+| Error notes | Reveals whether mistakes are tolerable |
+| Regenerable requests | Makes the benchmark easier to inspect |
+
+Do not overgeneralize a 30-ticket test. It is a project benchmark, not a universal proof. Still, the method is worth copying: create a labeled set, ask fixed typed questions, record every request shape, and inspect the error categories before turning on automation.
+
+## A Safe Jev AI Email Triage Architecture
+
+A production triage flow should be conservative at the boundaries:
+
+| Layer | Responsibility |
+|---|---|
+| Fetch | Pull message headers, sender, subject, and safe body text |
+| Redact | Remove secrets, tokens, payment numbers, and unnecessary quoted history |
+| Decide | Ask Jev tray, urgency, ownership, and escalation questions |
+| Store | Save probabilities, model ID, question version, and user corrections |
+| Act | Display, queue, label, or notify according to policy |
+| Review | Let users correct labels and inspect uncertain cases |
+
+Keep these actions separate:
+
+- Classification: what kind of message is this?
+- Prioritization: how urgent is it?
+- Authorization: is the tool allowed to move, label, archive, or send?
+- Generation: what should the reply say?
+
+Jev can help with classification and prioritization. Authorization belongs in application policy. Reply generation belongs to a human, template, or separate language model after the message has been routed.
+
+## Practical Rules for Builders
+
+Use these rules when turning a demo into a real inbox workflow:
+
+- Start read-only.
+- Keep categories few and meaningful.
+- Include an “uncertain” or human-review path.
+- Store the top two probabilities, not only the winning label.
+- Do not use urgency scores as hard SLA facts without calibration.
+- Split support routing from reply writing.
+- Let users correct trays without losing the original Jev answer.
+- Bind every decision to a question version.
+- Test separately for English, Chinese, and any other major support language.
+- Never send mail, archive messages, delete messages, or issue refunds from a Jev result alone.
+
+The best inbox products will feel boring when they work: obvious items move into the right tray, uncertain items ask for review, and the user always sees why an action was proposed.
+
+## FAQ
+
+### What is Jev AI email triage?
+
+Jev AI email triage is a workflow where Jev classifies emails or support tickets into bounded categories, scores urgency, and helps decide whether an item should be routed automatically or escalated to a human.
+
+### Can Jev write email replies?
+
+No. Jev is not a text-generation model. It can help decide which tray, team, urgency, or escalation path fits a message. A human, template, or separate writing model should handle replies.
+
+### Is Jevmail safe for Gmail?
+
+Jevmail's README describes a read-only Gmail OAuth scope, which is a safer starting point because the app cannot mark mail read, archive, label, report spam, or send through that grant. Users should still review provider permissions and local configuration.
+
+### Should low-confidence tickets be auto-routed?
+
+No. Low-confidence tickets are exactly where Jev AI email triage should escalate to a human. Confidence gates are useful because they prevent uncertain cases from becoming silent automation errors.
+
+### Can Jev replace a customer support platform?
+
+No. Jev can act as a decision layer inside a support workflow. Ticket history, SLAs, account permissions, refunds, macros, agent notes, and audit logs still belong to the support platform or application code.
