@@ -1,0 +1,137 @@
+export const metadata = {
+  "title": "Jev AI Integrations: 6 Ways to Add Jev to Apps",
+  "description": "Compare Jev AI integrations for AI SDK, TanStack AI, Cloudflare Workers, LangChain, eve, TypeSafe SDKs, HTTP APIs, and Vercel Gateway.",
+  "category": "integrations",
+  "date": "2026-09-23",
+  "status": "draft"
+};
+
+## What Changed for Jev AI Integrations?
+
+The newest public update worth tracking is Vercel's September 21 guide to **Jev AI integrations**. It organizes the practical paths into AI SDK, TanStack AI, Cloudflare, LangChain, eve, and TypeSafe's SDK or HTTP API. That matters because Jev is no longer only a model announcement; developers now have several documented ways to call it from real application stacks.
+
+The broader momentum is also visible in Vercel's AI Gateway launch data. Vercel reported that within 24 hours of launching on AI Gateway, Jev reached more paid teams than any prior model launch in Gateway history, with nearly 13% of paid teams using it by hour 24. That does not prove long-term adoption, but it is a strong signal that structured decision models are getting tested quickly in production environments.
+
+Use this page as a routing guide. It does not claim that every integration has been tested by Jev AI Guides. Instead, it maps each documented route to the kind of application that should start there.
+
+| Source-backed update | Date | Why it matters |
+|---|---:|---|
+| [Vercel: fastest-adopted model in AI Gateway history](https://vercel.com/blog/ai-gateway-jev-model-launch) | Sep 18, 2026 | Shows first-day production interest in Jev through AI Gateway |
+| [Vercel: 6 ways to integrate Jev](https://vercel.com/i/jev-integrations) | Sep 21, 2026 | Lists current framework, gateway, and direct-client paths |
+| [Vercel AI Gateway changelog](https://vercel.com/changelog?category=ai-gateway) | Sep 21, 2026 | Notes TypeSafe-compatible clients and an HTTP API for Jev |
+| [Vercel Connect Jev connector](https://vercel.com/connect/jev) | Current | Adds a credential-management path for Vercel-hosted apps and agents |
+
+## Choose the Right Jev AI Integration Path
+
+Vercel's integration guide frames the choice around your existing application stack. That is the right starting point. A Jev integration should reduce glue code around structured decisions; it should not force a team to rewrite a working application around a new library.
+
+| Your application already uses | Start with | Request destination |
+|---|---|---|
+| AI SDK | `experimental_evaluate` with a Jev evaluation model | Vercel AI Gateway or TypeSafe directly |
+| TanStack AI | `decide()` with a Jev-compatible adapter | TypeSafe, Vercel AI Gateway, Cloudflare, or OpenRouter |
+| Cloudflare Workers | `env.AI.run('typesafe/jev', ...)` | Cloudflare AI |
+| LangChain in Python | `TypeSafeClassifier.invoke()` | TypeSafe by default |
+| eve agents | Evaluation, model-selection, or tool-approval helpers | Vercel AI Gateway by default, or a configured provider |
+| Direct client or custom backend | TypeSafe SDK or `POST /v1/systemone` | TypeSafe or a compatible gateway |
+
+The important distinction is between the library interface and the service receiving the request. AI SDK or TanStack AI defines how your code asks a question and reads the answer. Vercel AI Gateway, Cloudflare AI, OpenRouter, or TypeSafe receives the actual request. Mixing those layers up leads to wrong model IDs, wrong answer fields, and fragile migration work.
+
+## AI SDK and Vercel AI Gateway
+
+AI SDK is the most natural route when Jev sits beside model calls in a TypeScript application. Vercel's guide says AI SDK uses `experimental_evaluate` for evaluation tasks and can send a Gateway model ID through Vercel AI Gateway.
+
+The documented Vercel example uses `typesafe-ai/jev` as the evaluation model and asks Jev to classify an invoice-related support message into a team such as billing, account, or other. The output is a typed answer that application code can map to a support queue.
+
+| AI SDK detail | Practical meaning |
+|---|---|
+| `experimental_evaluate` | Evaluation API is still experimental, so check changes when upgrading |
+| `typesafe-ai/jev` | Vercel Gateway model identifier shown in the integration guide |
+| Named question keys | Answers are read by the same question names your app sends |
+| Gateway auth | Configure `AI_GATEWAY_API_KEY` or server-side Vercel authentication |
+
+This route is especially useful for Next.js and Vercel teams that already use AI SDK. Keep the Jev call on the server. Do not expose Gateway or TypeSafe credentials in browser code.
+
+## TanStack AI Adapters
+
+TanStack AI is a fit when your application already expresses decisions through `decide()` and adapter configuration. Vercel's guide lists a direct TypeSafe adapter, a Vercel Gateway adapter, a Cloudflare adapter, and an OpenRouter adapter.
+
+The practical benefit is portability. You can keep the same state and decision question while changing the adapter that reaches Jev. That does not mean every field is identical. TanStack AI may expose a selected choice as `value`, while AI SDK examples use `choice`, and native TypeSafe uses its own response structure.
+
+| Request path | Adapter direction | Credential pattern |
+|---|---|---|
+| Direct TypeSafe | TypeSafe decider for `jev-latest` | `TYPESAFE_API_KEY` |
+| Vercel AI Gateway | Gateway decider for `typesafe-ai/jev` | `AI_GATEWAY_API_KEY` or Vercel OIDC |
+| Cloudflare | Cloudflare decider for `typesafe/jev` | Cloudflare account credentials or Worker binding |
+| OpenRouter | OpenRouter decision adapter | `OPENROUTER_API_KEY` |
+
+Use TanStack AI when adapter switching is part of the architecture. If you only need a simple API call, a direct SDK or HTTP route may be easier to maintain.
+
+## Cloudflare Workers
+
+Cloudflare is the clearest route for teams already running code in Workers. The model identifier documented by Cloudflare is `typesafe/jev`, and the call uses `env.AI.run()`.
+
+This path keeps Jev close to edge or serverless routing logic. A Worker can evaluate a support message, form submission, moderation event, or risk signal, then pass a typed result into ordinary application logic. Cloudflare's Jev documentation also shows an HTTP route for account API access when a binding is not the right fit.
+
+The main caveat is portability. The Cloudflare model ID and request wrapper should not be copied into Vercel or TypeSafe code without checking the target platform's own docs.
+
+## LangChain, eve, and Agent Workflows
+
+LangChain is useful when the Jev decision belongs inside an existing Python workflow. Vercel's guide points to `TypeSafeClassifier.invoke()` and notes that LangChain exposes Choice, Score, and Noul question classes. This route is suitable for agent routing, tool checks, and workflow classifiers where LangChain already owns the orchestration.
+
+eve is more agent-native. Vercel's integration guide describes Jev use inside evaluation, model-selection, and tool-approval helpers. In that shape, Jev does not write the agent's reply. It decides whether a proposed tool call is clear, cautionary, or needs a person; a separate language model still produces user-facing prose.
+
+| Agent route | Best fit | Keep in code |
+|---|---|---|
+| LangChain `TypeSafeClassifier` | Python workflows and LangSmith-traced decisions | Tool permissions, thresholds, fallbacks |
+| eve evaluation helpers | Vercel agent workflows and tool approvals | Actual command permissions and human approval |
+| Model selection | Choosing among allowed response models | Allowed model list and review policy |
+
+The repeated pattern is simple: Jev supplies a structured signal, but the application still owns the action.
+
+## TypeSafe SDKs, HTTP API, and Vercel Connect
+
+For applications that do not use AI SDK, TanStack AI, LangChain, or eve, TypeSafe's SDKs and HTTP API remain the direct path. Vercel's guide references TypeSafe Python and JavaScript or TypeScript clients, plus `POST https://api.typesafe.ai/v1/systemone` for HTTP integrations.
+
+Vercel also published a Jev connector page for Vercel Connect. That page focuses on credential handling: install the Connect skill, create a Jev connector, and request credentials at runtime through `@vercel/connect`. The point is not a new model capability. It is a safer way for apps and agents to access Jev credentials without copying secrets into application code.
+
+| Option | Use it when | Watch out for |
+|---|---|---|
+| TypeSafe SDK | You want direct provider access with typed clients | Provider credentials and model versioning |
+| TypeSafe HTTP API | Your stack has no supported library | Request and response validation |
+| Vercel Gateway TypeSafe-compatible API | You want Gateway routing while keeping TypeSafe-style requests | Gateway authentication and base URL |
+| Vercel Connect | You need managed runtime credentials in Vercel apps or agents | Connector setup and environment binding |
+
+The Vercel changelog also notes TypeSafe-compatible clients and an HTTP API for Jev on AI Gateway. That makes Vercel more than an AI SDK path: it can also be a routing layer for teams that want Gateway access while preserving a TypeSafe-style client shape.
+
+## Migration Checklist
+
+When changing Jev AI integrations, keep the decision contract stable first. Then adapt the transport layer.
+
+| Check | Why it matters |
+|---|---|
+| Same state | Different integrations should evaluate the same evidence |
+| Same criteria | Changing criteria changes behavior more than changing adapters |
+| Correct model ID | Vercel, Cloudflare, OpenRouter, and TypeSafe use different identifiers |
+| Correct answer path | `choice`, `value`, `noul`, probability, and confidence fields vary |
+| Server-side secrets | Gateway, TypeSafe, Cloudflare, and OpenRouter keys must stay off the client |
+| Review thresholds | Automation rules should not silently change during migration |
+
+Jev accepts text-based state and returns typed decisions. Connecting it through a framework that also supports text generation, images, or agents does not turn Jev into a generator. Use it for classification, scoring, routing, and approval signals; keep generative models responsible for writing.
+
+## FAQ
+
+### What is the easiest Jev AI integration?
+
+The easiest route depends on your stack. AI SDK is natural for Vercel and TypeScript apps, Cloudflare Workers can call `env.AI.run('typesafe/jev', ...)`, and Python LangChain workflows can start with `TypeSafeClassifier`.
+
+### Can I use Jev through Vercel without AI SDK?
+
+Yes. Vercel's September 21 changelog says AI Gateway supports TypeSafe-compatible clients and an HTTP API for Jev. The Vercel integration guide also describes a TypeSafe-compatible Gateway base URL and HTTP evaluation endpoint.
+
+### Is `typesafe-ai/jev` the same as `typesafe/jev`?
+
+No. Vercel's guide uses `typesafe-ai/jev` for AI Gateway, while Cloudflare documents `typesafe/jev` for Workers AI. Copy the identifier for the platform you are actually using.
+
+### Should Jev control production actions by itself?
+
+No. Jev should return a structured decision signal. Code should enforce permissions, thresholds, logging, fallbacks, and human review for consequential actions such as refunds, account changes, publishing, or command execution.
