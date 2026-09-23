@@ -1,0 +1,169 @@
+export const metadata = {
+  "title": "Jev AI Cookbook: 15 Practical Decision Recipes",
+  "description": "Explore the Jev AI cookbook with runnable recipes for triage, dedupe, PII detection, extraction, reranking, browser agents, Gmail, and moderation.",
+  "category": "community",
+  "date": "2026-09-23",
+  "status": "draft"
+};
+
+## What Is the Jev AI Cookbook?
+
+The new **Jev AI cookbook** projects are useful because they turn Jev from a model concept into a collection of small, testable decisions. Instead of asking Jev to write an answer, each recipe sends a state plus fixed questions and receives a Choice, Score, or Noul result that code can use.
+
+The largest current community collection is [`nexibeo/jev-cookbook`](https://github.com/nexibeo/jev-cookbook). Its README lists 15 runnable jobs with scripts, small labelled datasets, and measured results. The examples range from support triage and database indexing to PII scanning, invoice extraction, search reranking, browser automation, and Gmail labeling.
+
+This is a community cookbook, not an official TypeSafe product. Use it as a source of patterns and test ideas. Check the repository's own inputs, dates, model identifiers, and measurements before treating a result as a production benchmark.
+
+| Recipe family | Example jobs | Jev's role |
+|---|---|---|
+| Routing | Support triage, lead scoring, moderation | Pick a fixed category or escalation path |
+| Data organization | Database indexing, tagging, taxonomies, dedupe | Assign labels or compare records |
+| Verification | PII detection, invoice extraction, citation checks | Judge whether a result is supported or risky |
+| Search | Search reranking, RAG filtering | Score and order candidate passages |
+| Agents | Browser agent, Gmail labeler | Select an action or destination |
+
+## The 15 Recipes to Know
+
+The repository currently presents these practical jobs. They are best read as small workflow patterns rather than a promise that Jev is equally accurate on every task.
+
+| Recipe | Decision shape | Practical use |
+|---|---|---|
+| Support triage | Choice plus Noul | Route a message and detect urgency |
+| Database indexing | Choice | Assign a useful index or field category |
+| File organizer | Choice | Sort files into a defined taxonomy |
+| Tagging | Choice | Apply one or more known labels |
+| Category trees | Choice | Place items into hierarchical categories |
+| Duplicate detection | Noul or Score | Decide whether two records may be the same |
+| PII column scanner | Choice plus Noul and Score | Identify type, sensitivity, and personal-data risk |
+| Bank transactions | Choice | Categorize transaction descriptions |
+| Invoice extraction | Choice and verification | Check extracted fields against source text |
+| Search reranking | Score | Rank candidate documents for relevance |
+| Log triage | Choice | Route events to operational categories |
+| Moderation | Choice plus Noul | Classify content and flag policy conditions |
+| Lead scoring | Score | Rank leads against ordered criteria |
+| Browser agent | Choice | Select an operation and page element |
+| Gmail labeler | Choice | Assign a mailbox label or review route |
+
+The “pick, don't extract” principle runs through the collection. If the valid answers are already known, define them as choices instead of asking a generative model to invent a label and then parsing the text.
+
+## Start with Routing and Triage
+
+Support triage is the easiest recipe to understand because the output usually maps directly to a business queue. The state can contain a customer message, recent account context, or transaction information. Jev can answer separate questions for department, urgency, refund intent, or frustration.
+
+| Question | Jev primitive | Code-owned result |
+|---|---|---|
+| Which department owns this? | Choice | Route to billing, technical, account, or other |
+| Is the request urgent? | Noul | Prioritize or send to review |
+| How frustrated is the customer? | Score | Set an escalation level |
+| Does the customer ask for a refund? | Noul | Start a policy review, not an automatic payment |
+
+Keeping the questions separate makes the workflow easier to test. A department label should not silently become an approval to refund, and an urgency probability should not be confused with sentiment.
+
+For a first Jev project, choose one queue and one fallback route. Compare Jev's answers with a small labelled set before adding automatic actions.
+
+## Data Organization, Dedupe, and PII
+
+Jev is also a good fit for messy data tasks where the destination categories are defined but the source text is inconsistent.
+
+Database indexing and file organizing can classify names, descriptions, or column values into a known taxonomy. Duplicate detection can ask whether two records refer to the same entity, while PII scanning can combine a Choice question for field type, a Noul question for whether it contains personal data, and a Score question for sensitivity.
+
+| Data task | Better Jev question | Safeguard |
+|---|---|---|
+| Duplicate records | Are these records the same entity? | Send uncertain matches to a curator |
+| File organizer | Which folder category fits? | Keep the original path and allow undo |
+| PII detection | Does this field contain personal data? | Treat Jev as a detector, not a legal conclusion |
+| Sensitivity scoring | How restricted is this field? | Apply a policy approved by the data owner |
+| Taxonomy assignment | Which known branch fits? | Keep an “other” or review branch |
+
+These workflows show why typed decisions can be more practical than generated JSON. The application already knows the allowed folders, categories, or sensitivity levels. Jev supplies a judgement over those options; code owns the write.
+
+## Extraction with Verification
+
+Invoice extraction is a useful boundary case. A small generative model may extract fields such as vendor, invoice number, date, and total. Jev can then judge whether a proposed value is supported by the source text or whether the field should be reviewed.
+
+The safer architecture is a cascade:
+
+1. Extract candidate fields with a suitable extraction model or parser.
+2. Validate exact formats and arithmetic in ordinary code.
+3. Ask Jev focused questions about semantic support or field correctness.
+4. Escalate uncertain fields to a stronger model or human reviewer.
+5. Store the source span and decision result for audit.
+
+The official [TypeSafe SDE cascade cookbook](https://docs.typesafe.ai/cookbooks/sde_cascade.md) describes a similar mini, verify, and reasoning flow. Its verifier stage uses Jev per-field Noul questions to decide whether a cheap extraction result should be kept or escalated.
+
+| Check | Use Jev for | Use code for |
+|---|---|---|
+| Vendor name | Whether the text supports the proposed entity | Exact string normalization |
+| Invoice date | Whether a date appears in the relevant field | Date parsing and ordering |
+| Total | Whether the amount is supported | Arithmetic and currency validation |
+| Line items | Whether the extracted item belongs to the invoice | Schema and duplicate-row checks |
+
+Do not ask Jev to perform arithmetic or date comparison when code can do it exactly. Use Jev for the semantic question around the values.
+
+## Search Reranking and RAG
+
+The cookbook's search and reranking recipes fit naturally beside Jev's official RAG patterns. Retrieval finds candidates. Jev can rank or filter those candidates before a generative model sees them.
+
+The process should remain explicit:
+
+| Stage | Output |
+|---|---|
+| Retrieve | Candidate passages or documents |
+| Score | Relevance or support score for each candidate |
+| Filter | Keep evidence above a tested policy threshold |
+| Check | Detect contradiction, hidden instructions, or prompt injection |
+| Generate | Write the answer from the retained context |
+| Verify | Check claims against retained evidence |
+
+The official [TypeSafe RAG passage cookbook](https://docs.typesafe.ai/cookbooks/classifying_rag_passages.md) includes relevance, contradiction, and prompt-injection checks. The community cookbook extends the same idea to practical search and reranking scripts.
+
+The key evaluation question is not “did Jev improve retrieval?” in the abstract. Measure answer quality, citation support, latency, token cost, false removals, and cases where a useful passage was filtered out.
+
+## Browser Agents and Gmail Labeling
+
+The browser-agent recipe uses Jev to select one operation from a controlled action space. The browser layer observes the page and prepares candidates; Jev chooses the action and target; code validates freshness and executes it.
+
+The Gmail labeler follows the same structure with a different surface. The state is an email or thread, the choices are mailbox labels or review routes, and code applies the selected label through the Gmail API.
+
+| Workflow | Candidate choices | Side effect |
+|---|---|---|
+| Browser agent | Click, type, scroll, wait, done, blocked | Browser driver action |
+| Gmail labeler | Finance, support, newsletter, review | Gmail label update |
+| Log triage | Error, warning, deploy, security, other | Queue or alert route |
+| Moderation | Allow, review, block | Policy workflow |
+
+Never let the model call an irreversible operation directly. Keep deletion, sending, publishing, purchases, and account changes behind code permissions and, where appropriate, human confirmation.
+
+## How to Measure a Cookbook Recipe
+
+A runnable script is useful, but a good Jev AI cookbook entry needs more than a successful example.
+
+| Measurement | What to record |
+|---|---|
+| Quality | Correct labels, ranking metrics, field support, or escalation recall |
+| Coverage | How many real input shapes were tested |
+| Abstention | What happens when no option fits |
+| Latency | End-to-end time, not only model response time |
+| Cost | Input tokens, number of calls, and helper-model cost |
+| Reliability | Retries, rate limits, errors, and partial failures |
+| Reproducibility | Model ID, criteria, dataset, date, and raw outputs |
+
+The community benchmark repository is a useful reminder that a specialized decision model should be measured against a real baseline. A recipe can look fast and cheap but still harm answer quality if it removes evidence, misroutes a customer, or overconfidently labels a sensitive field.
+
+## FAQ
+
+### What is the best Jev AI cookbook example for beginners?
+
+Start with support triage or a fixed taxonomy. Both have clear choices, easy labelled examples, and reversible outcomes. Add confidence-aware review before connecting the result to a business action.
+
+### Can I use the Jev cookbook recipes with OpenRouter?
+
+The community cookbook is built around OpenRouter access and documents the model identifier used by its scripts. Confirm the current model ID and Decisions API format in the repository before running it, because provider identifiers can change.
+
+### Should Jev extract invoice fields by itself?
+
+Usually no. Use a parser or generative extraction model to propose fields, then use code for exact validation and Jev for semantic support or escalation checks.
+
+### Is a Jev cookbook result a production benchmark?
+
+No. Treat it as a recipe-specific experiment unless the dataset, baseline, model version, criteria, run count, and failure cases are disclosed and match your own workload.
