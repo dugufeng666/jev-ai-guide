@@ -1,0 +1,199 @@
+export const metadata = {
+  "title": "Jev AI Semantic Search: Code, Postgres, and MCP Tools",
+  "description": "Explore Jev AI semantic search tools for code navigation, Postgres filters, MCP document finding, RAG reranking, and exact source retrieval.",
+  "category": "community",
+  "date": "2026-09-23",
+  "status": "draft"
+};
+
+## What Is Jev AI Semantic Search?
+
+**Jev AI semantic search** uses Jev to judge which candidates match a natural-language condition. The result is not a generated summary. It is a probability, a selected candidate, a ranking signal, or a yes-or-no filter that code can use to return exact files, rows, passages, or tools.
+
+New community projects show several versions of this idea:
+
+- [JevFind](https://github.com/Peu77/JevFind) finds relevant files, line ranges, and source snippets from a plain-English query.
+- [JevGrep](https://github.com/nassim-arifette/jevgrep) exposes semantic repository search through a CLI and MCP server.
+- [pg-jev](https://github.com/realZachi/pg-jev) lets PostgreSQL filter, rank, and classify rows with plain-language conditions.
+- [jev-mcp](https://github.com/jkudish/jev-mcp) exposes find, rerank, verify, screen, compare, and browser-oriented decisions as MCP tools.
+
+The shared architecture is simple: the application creates a candidate set, Jev scores or selects within it, and ordinary code returns the exact source or performs the database operation.
+
+| Search problem | Candidate set | Jev's role |
+|---|---|---|
+| Find code by behavior | Files and code windows | Score file and snippet relevance |
+| Find a document | Notes, pages, or records | Pick a candidate or return no match |
+| Filter database rows | Rows or row batches | Evaluate a natural-language condition |
+| Rerank RAG results | Retrieved passages | Score relevance or support |
+| Find a tool or skill | Registered candidates | Select an allowed option |
+
+## Semantic Search Is Not Embedding Search
+
+Embedding search and Jev semantic search can both answer natural-language queries, but they solve the problem differently.
+
+| Approach | Main mechanism | Strength |
+|---|---|---|
+| Lexical search | Exact terms and text patterns | Fast, deterministic, easy to inspect |
+| Embedding search | Vector similarity | Broad recall over large corpora |
+| Jev candidate judging | Typed semantic question over supplied candidates | Explicit criteria, probabilities, and bounded output |
+| Hybrid search | Lexical or vector retrieval followed by Jev | Candidate recall plus semantic review |
+
+Jev does not magically search an unlimited corpus. It still needs a manageable candidate set or a controlled scan strategy. For code navigation, a project can enumerate files, ask Jev which paths are relevant, then scan selected files for matching windows. For database filtering, rows can be batched into shared state and evaluated with one question per row.
+
+Use exact search when you know the symbol or literal. Use Jev when the user describes behavior without knowing the identifier, such as “where does the application verify JWTs?” A strong tool should support both.
+
+## JevFind for Code Search
+
+[JevFind](https://github.com/Peu77/JevFind) is a Rust-based code finder. Its example query asks where user JWT authentication happens and returns a file, line range, confidence percentage, and source snippet.
+
+The tool separates two levels of relevance:
+
+1. File selection: decide which files are relevant enough to inspect.
+2. Window matching: find code windows inside selected files that match the concept.
+
+| JevFind feature | Why it matters |
+|---|---|
+| Plain-English query | Users can describe behavior instead of symbols |
+| File threshold | Avoid scanning every file when recall is not the priority |
+| Window threshold | Hide weak snippet matches |
+| Line ranges | Return exact source locations rather than a generated summary |
+| Debug tree | Show which files are pending, scanned, rejected, or matched |
+| Ignore rules | Avoid `.git`, `node_modules`, build output, and other noise |
+
+The README warns that source code and paths are sent to the TypeSafe API. That is a critical privacy consideration for private repositories. A semantic code search tool should expose its scan scope, provider, key handling, and retention assumptions before a developer runs it on sensitive code.
+
+The output also consists of overlapping code windows rather than guaranteed AST boundaries. That makes it useful for navigation, but not a replacement for a parser, compiler, or static-analysis engine.
+
+## JevGrep for Coding Agents
+
+[JevGrep](https://github.com/nassim-arifette/jevgrep) targets coding-agent workflows. It provides a CLI and MCP server for locating behavior across repositories and returning exact source excerpts with line numbers.
+
+The project explicitly positions itself beside ordinary tools:
+
+- Use `rg` or another exact search when you know the identifier.
+- Use JevGrep when the behavior is spread across implementation, configuration, and tests.
+- Return source excerpts instead of asking a model to summarize the repository.
+
+| Coding-agent task | Better tool shape |
+|---|---|
+| Find `authenticateUser` | Exact text search |
+| Find where login failures become 401 responses | Jev semantic search |
+| Find all references to a config key | Exact text search |
+| Find the feature's code, tests, and config | JevGrep plus exact follow-up search |
+| Explain a returned function | Generative model after source retrieval |
+
+JevGrep also documents provider choices for TypeSafe, Vercel AI Gateway, and OpenRouter, plus cache identities and rolling model policies. This matters for reproducibility: a semantic search result may change when the provider, model version, question, or cached score changes.
+
+The safest agent loop is therefore:
+
+1. Use semantic search to find candidate files.
+2. Return exact excerpts and line numbers.
+3. Let the agent inspect the source.
+4. Use deterministic tools to verify symbols, references, and tests.
+5. Keep generated explanation separate from retrieved evidence.
+
+## PostgreSQL with pg-jev
+
+[pg-jev](https://github.com/realZachi/pg-jev) brings Jev into PostgreSQL as an extension. Its examples use plain-language predicates such as whether a person's name is European, whether a customer is angry, or which team should handle a ticket.
+
+The extension supports three familiar shapes:
+
+| SQL helper | Jev primitive | Example |
+|---|---|---|
+| `jev()` | Noul | Filter rows by a condition |
+| `jev_prob()` | Noul probability | Sort or threshold rows by likelihood |
+| `jev_choice()` | Choice | Group rows by a selected category |
+| `jev_score()` | Score | Order rows on an ordered semantic scale |
+
+The project reports batching rows into shared requests, concurrent connections, per-row session caching, and progress notices. Its benchmark notes that batches of 1 to 20 rows were more reliable than larger indexed arrays in the tested setup, while larger batches showed a drop in correctness.
+
+Those measurements belong to the repository's own benchmark. The broader design lesson is more durable: database integration needs batching, caching, prefilters, limits, and a clear cost model.
+
+| Database safeguard | Why it matters |
+|---|---|
+| Apply cheap SQL predicates first | Avoid judging rows that can be filtered deterministically |
+| Limit read-ahead | Prevent accidental scans of a large table |
+| Batch conservatively | Preserve row identity and answer reliability |
+| Cache by row content and question | Avoid paying twice for unchanged judgements |
+| Keep notices and usage metrics | Make semantic queries observable |
+| Require review for writes | Do not turn a probability into an irreversible update |
+
+The best use cases are exploratory filters, triage, ranking, and read-only analysis. A production system should be careful when Jev decisions drive updates, deletes, permissions, or customer-facing actions.
+
+## Jev MCP for Find, Rerank, and Verify
+
+[jev-mcp](https://github.com/jkudish/jev-mcp) packages several semantic operations as MCP tools:
+
+| Tool pattern | What it can return |
+|---|---|
+| Find | One candidate from a supplied set, with escape hatches |
+| Rerank | Relevance judgement for each candidate |
+| Verify | Supports, contradicts, or says-nothing relation |
+| Screen | Independent yes-or-no probabilities |
+| Compare | Same, related, or different across named aspects |
+| Browser | An action and compatible page target |
+
+This is a useful unification. Document search, citation verification, dedupe, RAG reranking, browser control, and tool selection can all be expressed as a typed decision over an application-owned candidate set.
+
+The MCP project also documents provider adapters for TypeSafe, Vercel AI Gateway, Cloudflare Workers AI, and OpenRouter. Platform model identifiers differ:
+
+| Provider | Jev identifier in the project documentation |
+|---|---|
+| TypeSafe | Direct TypeSafe API |
+| Vercel AI Gateway | `typesafe-ai/jev` |
+| Cloudflare Workers AI | `typesafe/jev` |
+| OpenRouter | `typesafe/jev-1.13` |
+
+Do not copy one provider's model ID and endpoint into another integration without checking the target provider's current documentation.
+
+## A Hybrid Search Workflow
+
+Jev semantic search is strongest when it is part of a layered retrieval system.
+
+1. Use exact or vector retrieval to generate candidates.
+2. Remove ignored paths, unsupported formats, or unauthorized records in code.
+3. Ask Jev a focused question over the remaining candidates.
+4. Return exact files, rows, excerpts, or URLs.
+5. Let a generative model explain the retrieved evidence only after retrieval.
+6. Log candidates, criteria, probabilities, thresholds, and final results.
+
+| Layer | Example |
+|---|---|
+| Recall | `rg`, SQL predicates, file walker, vector index |
+| Semantic decision | Jev Choice, Score, or Noul |
+| Exact evidence | Source lines, row IDs, URLs, document spans |
+| Explanation | Generative model or template |
+| Action | Code, approval flow, or human |
+
+This architecture prevents a common failure mode: asking a chat model to “search the codebase” and trusting a generated file path without evidence. Jev can reduce the search space, but the application should return the actual source or record that supports the answer.
+
+## Privacy, Costs, and Reproducibility
+
+Semantic search often sends source code, database text, documents, or internal notes to a model provider. That makes privacy part of the product design.
+
+- Define which paths, tables, and fields can leave the environment.
+- Redact secrets before building candidate state.
+- Keep credentials server-side or in local configuration.
+- Record provider, model ID, question, thresholds, and cache policy.
+- Prefer read-only operations while evaluating a new tool.
+- Add a human approval step before writes or external actions.
+
+Cache behavior also affects reproducibility. A cached semantic score may be useful for speed and cost, but the system should be able to show whether a result came from a fresh provider call or a previous evaluation.
+
+## FAQ
+
+### Is Jev AI semantic search the same as vector search?
+
+No. Vector search retrieves candidates using embeddings, while Jev evaluates supplied candidates with typed questions. A hybrid system can use vector or lexical search for recall and Jev for reranking, filtering, or verification.
+
+### Can Jev search an entire codebase?
+
+A tool can scan a codebase and send selected files or windows to Jev, but Jev does not directly access an unlimited repository. The tool must control file traversal, batching, ignored paths, secrets, and output evidence.
+
+### Can pg-jev replace SQL?
+
+No. pg-jev adds semantic predicates and rankings to PostgreSQL. Use SQL for exact filters, joins, arithmetic, permissions, and deterministic constraints; use Jev for bounded semantic judgements.
+
+### Should a coding agent trust Jev search results?
+
+It should use them as candidate navigation signals and inspect the returned source. Exact line ranges, tests, symbol searches, and human review remain important before changing code.
