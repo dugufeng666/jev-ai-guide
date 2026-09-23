@@ -1,0 +1,201 @@
+export const metadata = {
+  "title": "Jev AI Entity Matching: Deduplication and Record Linkage",
+  "description": "Learn how Jev AI entity matching compares records, routes same or different decisions, exposes field conflicts, and keeps uncertain pairs for review.",
+  "category": "community",
+  "date": "2026-09-23",
+  "status": "draft"
+};
+
+## What Is Jev AI Entity Matching?
+
+**Jev AI entity matching** uses Jev to decide whether two records describe the same real-world entity. Typical inputs include product catalogs, company records, supplier feeds, knowledge-graph nodes, or customer data from two systems.
+
+The goal is not to make two strings look similar. A useful matcher must consider identity fields, aliases, identifiers, variants, provenance, and conflicts. The safest output is often a three-way decision:
+
+- **Same:** link or merge only when the identity evidence is strong.
+- **Review:** keep both records and send the pair to a curator.
+- **Different:** leave the records unlinked.
+
+The official [TypeSafe entity-alignment cookbook](https://docs.typesafe.ai/cookbooks/entity_alignment.md) uses this shape with a Score question and additional Noul questions for field-level evidence. The [Open-Jev entity-alignment control](https://github.com/Zefan-Cai/Open-Jev/blob/main/docs/entity-alignment-control.md) shows how to keep the policy, synthetic data, deterministic preprocessing, and audit checks visible.
+
+| Matching stage | Responsibility |
+|---|---|
+| Normalize | Code standardizes casing, units, punctuation, and known aliases |
+| Candidate generation | Search or blocking finds plausible pairs |
+| Entity comparison | Jev evaluates the candidate pair under an identity policy |
+| Conflict explanation | Noul questions expose which fields disagree |
+| Routing | Code links, reviews, or leaves the pair separate |
+| Audit | Store input, criteria, answer, model version, and final decision |
+
+## Entity Matching Is Not Just Deduplication
+
+Deduplication finds repeated records inside one dataset. Record linkage connects records across sources. Entity resolution is the wider process that includes normalization, candidate generation, comparison, clustering, conflict handling, and maintaining the final links.
+
+Jev can supply the comparison decision, but it does not automatically build the entire entity-resolution system.
+
+| Task | Example | Jev's likely role |
+|---|---|---|
+| Deduplication | Two rows may describe the same product | Same, review, or different |
+| Record linkage | A supplier item matches a catalog item | Compare candidate pair |
+| Knowledge-graph alignment | Two nodes may represent one entity | Assert `sameAs`, review, or leave unlinked |
+| Alias matching | Brand name differs by abbreviation | Judge compatibility under a written policy |
+| Variant handling | Same base product but different capacity | Distinguish same product from a variant |
+
+This distinction prevents an expensive implementation mistake: using a model decision as if it were permission to merge a database. Jev can recommend a relationship; application code and a review policy should control the write.
+
+## The Three-Way Jev Decision
+
+The official cookbook's central pattern defines an ordered Score scale with three outcomes:
+
+| Score level | Decision | Suggested action |
+|---:|---|---|
+| 0 | Different | Leave records unlinked |
+| 1 | Related but uncertain | Send to curator review |
+| 2 | Same entity | Create a link or allow a merge review |
+
+The middle state is important. A binary yes-or-no answer hides the difference between “clearly different” and “probably the same but missing evidence.” In data systems, those errors have different costs.
+
+The matching policy should define what each level means. For example:
+
+- **Different:** identity evidence conflicts or the entities are distinct variants.
+- **Review:** some fields agree, but an important field is missing, ambiguous, or contradictory.
+- **Same:** identity evidence agrees across the fields required for this entity type.
+
+Do not use a generic instruction such as “Are these records similar?” Similarity is not identity. The question should state what counts as the same entity and which conflicts are disqualifying.
+
+## Field-Level Conflict Questions
+
+The official cookbook adds Noul questions alongside the three-way Score. These questions expose why the pair received its decision.
+
+| Field question | What it can reveal |
+|---|---|
+| Do the names refer to the same item? | Alias, abbreviation, spelling, or naming conflict |
+| Do the manufacturers or owners match? | Cross-source identity conflict |
+| Do the styles or product types agree? | Category mismatch |
+| Do identifiers agree? | Strong evidence or direct contradiction |
+| Do measurements agree? | Same base item or different variant |
+
+These field signals are not automatically independent proof. A model can judge several questions against the same state, while code stores them as an explanation packet for a curator.
+
+The explanation is valuable because a “review” result should tell a person what to investigate. A generic confidence score does less than a record that says:
+
+| Evidence | Result |
+|---|---|
+| Name | Compatible |
+| Manufacturer | Missing on record B |
+| Identifier | Conflict |
+| Capacity | Same after unit conversion |
+| Overall | Review |
+
+Keep exact transformations in code. If a capacity is converted from liters to milliliters, the conversion should be deterministic and independently auditable. Jev can judge whether the resulting evidence establishes agreement, but it should not be the arithmetic engine.
+
+## Candidate Generation Comes Before Jev
+
+Large catalogs should not compare every record with every other record. First use deterministic or search-based blocking to create plausible candidate pairs.
+
+| Candidate-generation method | Example |
+|---|---|
+| Exact identifier | Same manufacturer SKU |
+| Normalized name | Same name after punctuation and case normalization |
+| Alias table | Known company or brand alias |
+| Search index | Top candidates by text retrieval |
+| Shared attributes | Same manufacturer and product family |
+| Vector or lexical retrieval | Similar descriptions for a review queue |
+
+The official cookbook example starts after a cheaper first pass has narrowed the candidate set. This division is sensible: retrieval reduces the number of pairs, and Jev handles the semantic comparison that remains.
+
+The application should retain the reason a pair entered the candidate set. A pair found through an exact identifier deserves a different audit trail from a pair found only through loose text similarity.
+
+## A Jev AI Entity Matching Workflow
+
+Use the following sequence for a first implementation:
+
+1. Define the entity type and what “same” means.
+2. Normalize fields with deterministic code.
+3. Generate candidate pairs with blocking or search.
+4. Place both records in one state as `entity_a` and `entity_b`.
+5. Ask one Score question for different, review, and same.
+6. Ask focused Noul questions for important fields.
+7. Preserve probabilities and field-level results.
+8. Route same, review, and different outcomes separately.
+9. Require human confirmation for high-cost merges.
+10. Audit decisions against labelled pairs.
+
+| Workflow object | Example fields |
+|---|---|
+| Record A | ID, source, name, manufacturer, variant, provenance |
+| Record B | ID, source, name, manufacturer, variant, provenance |
+| Policy | Entity type, required identity fields, disqualifying conflicts |
+| Candidate reason | Exact ID, alias, search result, shared attributes |
+| Jev result | Score, probabilities, field Noul answers, model version |
+| Final route | Link, review, leave separate |
+| Review record | Curator, reason, final decision, timestamp |
+
+This structure keeps the model decision separate from the database mutation. It also makes it possible to re-run decisions when the model version or policy changes.
+
+## Handling Variants and Conflicting Identifiers
+
+The hardest entity-matching cases are not obvious duplicates. They are records that share a name but differ in a meaningful identity field.
+
+| Case | Likely interpretation |
+|---|---|
+| Same name, same manufacturer, different capacity | Product variant or conflict; review policy required |
+| Different name, same stable identifier | Potential alias; inspect provenance and identifier quality |
+| Same name, different manufacturer | Often different entities; do not merge by name alone |
+| Same company, different legal entity suffix | Could be same organization or related entity |
+| Missing identifier, compatible descriptive fields | Review unless policy allows a soft match |
+| Conflicting source timestamps | Prefer provenance rules over model intuition |
+
+The model should receive the relevant policy in the state or question criteria. “Same product” may mean the same commercial SKU, the same base product family, or the same real-world object. Those are not interchangeable.
+
+Open-Jev's control documentation is a useful companion here because it keeps units, aliases, visible criteria, and independent audit logic explicit. Deterministic preprocessing should produce evidence such as normalized values and converted quantities before Jev makes the semantic judgement.
+
+## Error Costs and Human Review
+
+Entity matching errors are asymmetric. A false merge can contaminate every downstream fact attached to either record. A missed link may leave duplicate records that can be fixed later.
+
+| Error | Example | Typical response |
+|---|---|---|
+| False merge | Two similar products become one entity | High-severity review or block |
+| Missed match | Same product remains separate | Queue for later linking |
+| Wrong variant merge | Same name but different capacity | Require variant-specific policy |
+| Wrong alias link | Similar company names are merged | Preserve provenance and review |
+| Unexplained decision | Curator cannot see why it was matched | Retain field-level evidence |
+
+This is why the review outcome deserves first-class status. It is not a model failure. It is a normal part of a system that chooses caution when evidence is incomplete.
+
+## Measuring Entity Matching Quality
+
+Evaluate Jev on labelled candidate pairs, not only on a few examples that look convincing.
+
+| Metric | What it measures |
+|---|---|
+| Match precision | How many accepted links are correct |
+| Match recall | How many true links are found |
+| Review rate | How many pairs avoid automatic routing |
+| False-merge rate | How often distinct entities are incorrectly joined |
+| Field agreement | Whether conflict questions explain the final route |
+| Calibration | Whether returned probabilities match observed correctness |
+| Review efficiency | How many uncertain pairs a curator can resolve |
+
+Keep separate test sets for easy, ambiguous, and out-of-distribution pairs. Include aliases, typos, missing fields, misleading common names, unit differences, and deliberate conflicts.
+
+Do not optimize only for match accuracy. A system with slightly lower recall but a much lower false-merge rate may be better for a knowledge graph or catalog where incorrect merges are expensive.
+
+## FAQ
+
+### Can Jev AI deduplicate a database automatically?
+
+Jev can evaluate candidate pairs and return a same, review, or different style decision. It should not directly merge records without a policy, deterministic checks, provenance, audit logging, and review for costly or ambiguous cases.
+
+### What is the best Jev question for entity matching?
+
+Start with a three-way Score question for different, review, and same. Add Noul questions for important fields such as name compatibility, manufacturer agreement, identifier conflict, or variant consistency.
+
+### Should similar names be merged?
+
+No. Similar names are only one signal. Entity matching should consider identifiers, manufacturer or owner, product type, variants, provenance, and disqualifying conflicts.
+
+### Is entity matching the same as record linkage?
+
+They overlap but are not identical. Entity matching compares a candidate pair, while record linkage connects records across sources and entity resolution includes the larger normalization, candidate-generation, comparison, clustering, and maintenance process.
