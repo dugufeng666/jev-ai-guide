@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TrailerButton, localizeHref } from "@/components/site";
+import { AdsterraResponsiveDisplayAd } from "@/components/ads/adsterra-ads";
 import type { ContentItem } from "@/lib/content";
 import en from "@/locales/en.json";
 
@@ -84,6 +85,9 @@ export default function HomePageClient({ home, locale, articles, recentArticles 
           </div>
         </div>
       </section>
+
+      {/* One restrained placement after the first useful content block. */}
+      <AdsterraResponsiveDisplayAd />
 
       {/* Dynamic Content Section — auto-scrolling carousel */}
       {articles.length > 0 && (
