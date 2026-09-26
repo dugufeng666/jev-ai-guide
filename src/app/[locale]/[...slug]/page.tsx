@@ -21,6 +21,11 @@ function languageAlternates(pathname: string) {
   return Object.fromEntries(routing.locales.map((locale) => [locale, locale === "en" ? pathname : `/${locale}${pathname}`]));
 }
 
+function canonicalPath(pathname: string) {
+  if (pathname === "/") return pathname;
+  return pathname.endsWith("/") ? pathname : `${pathname}/`;
+}
+
 export async function generateStaticParams() {
   const paths = await getAllContentPaths("en");
   const listingPages = CONTENT_TYPES.map((ct) => ({ slug: [ct] }));
@@ -36,12 +41,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: L
     const ctMessages = (messages as unknown as Record<string, Record<string, string>>)[ct];
     const title = ctMessages?.overviewTitle || `${ctTitle} — ${siteName}`;
     const description = ctMessages?.overviewDescription || `Browse all ${ctTitle.toLowerCase()} guides and resources for Jev AI.`;
-    return { title, description, alternates: { canonical: `/${ct}`, languages: languageAlternates(`/${ct}`) }, openGraph: { title, description, url: `${siteUrl}/${ct}`, images: [`${siteUrl}/images/hero.webp`] } };
+    const pathname = canonicalPath(`/${ct}`);
+    return { title, description, alternates: { canonical: pathname, languages: languageAlternates(pathname) }, openGraph: { title, description, url: `${siteUrl}${pathname}`, images: [`${siteUrl}/images/hero.webp`] } };
   }
   const [contentType, ...articleSlug] = slug;
   const item = await getContent(contentType, articleSlug, locale);
   if (!item) return { title: "Not Found" };
-  const pathname = `/${contentType}/${articleSlug.join("/")}`;
+  const pathname = canonicalPath(`/${contentType}/${articleSlug.join("/")}`);
   const image = item.metadata.image?.startsWith("http") ? item.metadata.image : `${siteUrl}${item.metadata.image ?? "/images/hero.webp"}`;
   return { title: `${item.metadata.title} — ${siteName}`, description: item.metadata.description, alternates: { canonical: pathname, languages: languageAlternates(pathname) }, openGraph: { type: "article", title: item.metadata.title, description: item.metadata.description, url: `${siteUrl}${pathname}`, images: [image] }, twitter: { card: "summary_large_image", images: [image] } };
 }
@@ -57,7 +63,7 @@ async function NavigationPage({ locale, contentType, navGroups }: { locale: Loca
   if (!CONTENT_TYPES.includes(contentType)) notFound();
   const messages = (await getMessages({ locale })) as Messages;
   const items = await getAllContent(contentType, locale);
-  const listData = { "@context": "https://schema.org", "@type": "ItemList", name: `${contentType} — ${siteName}`, itemListElement: items.map((item, index) => ({ "@type": "ListItem", position: index + 1, url: `${siteUrl}/${contentType}/${item.slug}`, name: item.metadata.title })) };
+  const listData = { "@context": "https://schema.org", "@type": "ItemList", name: `${contentType} — ${siteName}`, itemListElement: items.map((item, index) => ({ "@type": "ListItem", position: index + 1, url: `${siteUrl}${canonicalPath(`/${contentType}/${item.slug}`)}`, name: item.metadata.title })) };
 
   // 读取分类标题（优先用 locale JSON 里的，没有就转 slug）
   const sectionTitle = (messages as unknown as Record<string, Record<string, string>>)[contentType]?.overviewTitle
@@ -72,7 +78,7 @@ async function DetailPage({ locale, contentType, slug, navGroups }: { locale: Lo
   const messages = (await getMessages({ locale })) as Messages;
   const item = await getContent(contentType, slug, locale);
   if (!item) notFound();
-  const pathname = `/${contentType}/${slug.join("/")}`;
+  const pathname = canonicalPath(`/${contentType}/${slug.join("/")}`);
   const tocLabel = messages.shared.tableOfContents || messages.shared.inThisSection || "Table of Contents";
   const sectionLabel = contentType.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   const image = item.metadata.image?.startsWith("http") ? item.metadata.image : `${siteUrl}${item.metadata.image ?? "/images/hero.webp"}`;

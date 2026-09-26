@@ -1,0 +1,191 @@
+export const metadata = {
+  "title": "Jev AI API Reference: Requests, Answers, and Errors",
+  "description": "Use this Jev AI API reference to understand authentication, systemone requests, typed answers, model IDs, validation, and production logging for real apps.",
+  "category": "api",
+  "date": "2026-09-25",
+  "lastModified": "2026-09-25",
+  "status": "draft"
+};
+
+## Jev AI API at a Glance
+
+The Jev AI API exposes one primary decision endpoint: `POST /v1/systemone`. You send a `state`, a `model`, and one or more typed questions. The response uses the same question names so application code can connect each answer to the decision it requested.
+
+This **Jev AI API** design is intentionally narrow: it evaluates supplied state and returns typed decisions rather than generating an open-ended answer. That makes the response easier for application code to validate and route.
+
+The official OpenAPI schema also exposes `GET /v1/models`, which lists model names and metadata available to the authenticated account. Consult the [official TypeSafe API documentation](https://api.typesafe.ai/docs) before shipping an integration because request fields and model availability can change.
+
+| Endpoint | Purpose | Authentication |
+| --- | --- | --- |
+| `POST /v1/systemone` | Evaluate one or more questions against state | Bearer API key |
+| `GET /v1/models` | List available model names and metadata | Bearer API key |
+
+Jev accepts text-oriented state in a string, JSON object, or array of text values. Images, audio, video, and binary files must be converted into text or structured fields before they are sent.
+
+## Build a Jev AI API Request
+
+### Authentication
+
+Send the key as a bearer token. Keep it on the server side, never in browser JavaScript or a public repository.
+
+```bash
+export TYPESAFE_API_KEY="replace-with-your-server-side-key"
+
+curl https://api.typesafe.ai/v1/models \
+  -H "Authorization: Bearer $TYPESAFE_API_KEY"
+```
+
+Use a secret manager or deployment environment for the key. A frontend should call your own backend endpoint, which applies authorization, rate limits, input filtering, and logging before calling TypeSafe.
+
+### System One Request Shape
+
+The exact SDK representation varies by language, but the HTTP API follows the same conceptual structure.
+
+```json
+{
+  "model": "jev-latest",
+  "state": {
+    "ticket_message": "The checkout API returns a 502 for every order."
+  },
+  "questions": {
+    "department": {
+      "type": "choice",
+      "instructions": "Which team should handle ticket_message first?",
+      "criteria": {
+        "technical": "Software bugs, outages, API failures, or integrations.",
+        "billing": "Charges, invoices, subscriptions, or payment records.",
+        "other": "The message does not fit the other options."
+      }
+    },
+    "urgent": {
+      "type": "noul",
+      "instructions": "Does ticket_message describe an active service outage?"
+    }
+  }
+}
+```
+
+The important design choice is to keep each question narrow. Several questions can share one state, but one answer should not silently become context for another answer. Combine the results explicitly in code.
+
+Prepare the state before the request reaches TypeSafe. Remove fields the question does not need, normalize timestamps and identifiers in code, and label user-controlled text clearly in your own data structure. This reduces accidental context and gives reviewers a stable explanation of what the question was allowed to see.
+
+Keep the request server-side. A browser application can call your backend, but it should not expose the TypeSafe key or let an untrusted client choose arbitrary model names, question definitions, or high-impact actions. The backend should own the questions and the policy that interprets each answer.
+
+## Typed Answer Shapes
+
+The official API schema defines three answer variants.
+
+| Answer type | Key fields | Application use |
+| --- | --- | --- |
+| `noul` | `noul` | Threshold a single proposition |
+| `choice` | `choice`, `probabilities`, `confidence` | Route to one known option |
+| `score` | `score`, `probabilities`, `confidence` | Apply an ordered semantic scale |
+
+Example response shape:
+
+```json
+{
+  "model": "jev-1.13.0",
+  "answers": {
+    "department": {
+      "type": "choice",
+      "choice": "technical",
+      "confidence": 0.94,
+      "probabilities": {
+        "technical": 0.94,
+        "billing": 0.03,
+        "other": 0.03
+      }
+    },
+    "urgent": {
+      "type": "noul",
+      "noul": 0.91
+    }
+  },
+  "usage": {
+    "input_tokens": 118,
+    "output_tokens": 12
+  }
+}
+```
+
+The numeric values above are an illustrative response shape, not a claim about what the sample text will return. Log real responses in your own evaluation environment.
+
+### Model IDs and Aliases
+
+The current official models page lists `jev-1.13.0` and the aliases `jev-latest` and `jev-preview`. Aliases can move when a new release ships. If a threshold has been tuned against one version, pin the versioned model ID and log the returned model with every decision.
+
+| Model name | Use |
+| --- | --- |
+| `jev-latest` | Follow the current stable release |
+| `jev-preview` | Test the current preview path when available |
+| `jev-1.13.0` | Pin behavior while evaluating or operating a tuned workflow |
+
+See the [official models page](https://docs.typesafe.ai/models) for current aliases, price, context limits, rate limits, and input support.
+
+## Operate the Jev AI API Safely
+
+### Validation and Error Handling
+
+An invalid request can return `422 Unprocessable Entity`, while authentication, rate-limit, network, and service errors should be handled separately by the client.
+
+| Condition | Likely response or symptom | Recommended handling |
+| --- | --- | --- |
+| Missing `state` or malformed question | `422` validation error | Fix the request; do not retry unchanged |
+| Invalid or missing API key | Authentication error | Rotate or reconfigure credentials |
+| Rate limit exceeded | `429` | Honor `retry-after`, back off, and queue work |
+| Provider is overloaded | `529` | Retry with exponential backoff and a bounded attempt count |
+| Network timeout | No reliable response | Retry with an idempotency strategy and bounded attempts |
+| Low confidence | Valid response | Apply review or fallback policy |
+| Wrong semantic decision | Valid response | Record the case for evaluation and question revision |
+
+Do not treat HTTP success as semantic correctness. A typed response can have the correct shape while the selected answer is still wrong for your domain.
+
+A reliable **Jev AI API** client therefore separates transport handling from semantic handling. First validate status, schema, and retry behavior; then apply the question-specific threshold, fallback, and authorization policy.
+
+The official SDK handles retries for some transient failures, but a direct HTTP client still needs an explicit policy for `429`, `529`, timeouts, and connection failures. Do not retry a malformed `422` request unchanged. Use jittered exponential backoff, cap the total retry time, and send the case to a safe fallback when the budget is exhausted.
+
+### Production Logging Checklist
+
+For every decision, log enough information to reproduce and review the policy without storing secrets unnecessarily:
+
+- Versioned model ID returned by the API.
+- Version of the question and criteria definition.
+- Input or a privacy-safe state identifier.
+- Answer type, selected value, probability, and confidence where available.
+- Threshold and policy branch used by the application.
+- Final human or business outcome.
+- Latency, token usage, retry count, and error category.
+
+The model page documents a 64k total request context and a 32k limit for state plus the longest question for Jev 1.13. The same page notes that rate limits may change, so operational settings should be monitored rather than hard-coded as permanent guarantees. Record token usage when it is returned, while enforcing your own input-size and cost limits before sending a request.
+
+### What Belongs Outside the API Call?
+
+Use ordinary software for:
+
+- Authentication and authorization.
+- Arithmetic, counting, date ordering, and exact formatting.
+- Database reads and writes.
+- Payment, deletion, permission, and account changes.
+- Deterministic policy checks.
+- Final audit records.
+
+Use Jev for the semantic judgment that remains after the application has prepared a compact, relevant state. The official [Jev 1.13 limitations](https://docs.typesafe.ai/model-jaggedness/jev-1.13) specifically warn about numeric precision, dates, indirection, irrelevant context, adversarial content, and generation.
+
+## Frequently Asked Questions
+
+### What is the main Jev AI API endpoint?
+
+The main endpoint is `POST /v1/systemone`. It evaluates one or more typed questions against the supplied state.
+
+### Can the API accept images or video directly?
+
+The current Jev model documentation lists text input only. Convert non-text material into text or structured fields before sending it.
+
+### Should I use `jev-latest` in production?
+
+Use the alias when you want the stable current release and are prepared to reevaluate behavior after upgrades. Pin a versioned model ID when tuned thresholds need controlled changes.
+
+### Does a valid API response mean the answer is correct?
+
+No. HTTP and schema validity only confirm that the request was accepted and the response has the expected structure. Evaluate semantic quality on representative data and keep high-impact actions behind application controls.

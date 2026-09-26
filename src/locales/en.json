@@ -171,25 +171,25 @@
         {
           "order": 3,
           "name": "Jev AI Decision Primitives",
-          "description": "Understand the three core Jev AI primitives and the product situations where each one makes sense.",
-          "href": "/model/jev-ai-structured-output",
+          "description": "Use focused reference pages for Jev AI Noul, Choice, and Score questions, including criteria design, thresholds, fallbacks, and failure modes.",
+          "href": "/model/jev-ai-noul",
           "displayType": "card-list",
           "highlights": [
             {
+              "label": "Noul",
+              "detail": "Evaluate one bounded proposition and route uncertain cases through a threshold or review queue."
+            },
+            {
               "label": "Choice",
-              "detail": "Pick one option from a defined set such as ticket type, next tool, or moderation category."
+              "detail": "Select one known option with probabilities, confidence, and an explicit fallback category."
             },
             {
               "label": "Score",
-              "detail": "Rate an ordered scale such as urgency, quality, intent strength, or customer sentiment."
-            },
-            {
-              "label": "Noul",
-              "detail": "Answer a bounded yes-or-no question for filters, gates, checks, and simple classifiers."
+              "detail": "Place text or state on a described ordered scale without treating the result as exact arithmetic."
             },
             {
               "label": "Batch",
-              "detail": "Ask several related decisions over the same input so the workflow can branch cleanly."
+              "detail": "Evaluate independent questions over shared state, then combine the typed answers in code."
             }
           ]
         },
@@ -295,26 +295,26 @@
         },
         {
           "order": 8,
-          "name": "Jev AI Use Cases",
-          "description": "Turn the core idea into concrete product patterns that can become tutorial pages, comparison pages, and implementation examples.",
-          "href": "/community/jev-ai-use-cases",
-          "displayType": "card-list",
+          "name": "Jev AI Evaluation Guide",
+          "description": "Build a trustworthy Jev AI workflow with labeled examples, threshold tests, adversarial cases, human review, and production monitoring.",
+          "href": "/guide/jev-ai-evaluation",
+          "displayType": "step-by-step",
           "highlights": [
             {
-              "label": "Support",
-              "detail": "Classify tickets, score urgency, and route customer requests to the right queue."
+              "label": "1",
+              "detail": "Write a decision contract that separates the model answer from the final business action."
             },
             {
-              "label": "Moderation",
-              "detail": "Check content against bounded labels before sending edge cases to review."
+              "label": "2",
+              "detail": "Collect common, ambiguous, rare, missing-data, and adversarial examples."
             },
             {
-              "label": "Search",
-              "detail": "Rank, filter, and categorize documents, clips, or pages for downstream workflows."
+              "label": "3",
+              "detail": "Measure precision, recall, confidence bands, review rate, latency, and cost."
             },
             {
-              "label": "Agents",
-              "detail": "Choose tools, stop conditions, review paths, and next actions inside agent loops."
+              "label": "4",
+              "detail": "Monitor model versions, question versions, human overrides, and drift after launch."
             }
           ]
         }

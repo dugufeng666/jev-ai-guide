@@ -1,0 +1,175 @@
+export const metadata = {
+  "title": "Jev AI Score Guide: Ordered Ratings and Review Rules",
+  "description": "Learn how Jev AI Score evaluates ordered criteria, defines levels, and guides decisions without pretending to replace exact measurements in production.",
+  "category": "model",
+  "date": "2026-09-25",
+  "lastModified": "2026-09-25",
+  "status": "draft"
+};
+
+## What Is Jev AI Score?
+
+**Jev AI Score** is the Jev primitive for placing a state on an ordered scale. You describe the levels in order, and Jev returns a score answer with the selected position, probabilities, and confidence information.
+
+Score is useful for semantic intensity: urgency, frustration, quality, risk, relevance, or readiness. It is not a calculator. The official Jev 1.13 guidance warns that score outputs should not be interpolated into exact numerical measurements.
+
+The practical value of **Jev AI Score** is that it turns a fuzzy language judgment into a bounded signal that an application can inspect. The surrounding policy still belongs to your code, your reviewers, and your domain-specific evaluation set.
+
+| Good Score use | Poor Score use |
+| --- | --- |
+| Is this ticket calm, concerned, or highly frustrated? | How many dollars should be refunded? |
+| Is this passage weak, moderate, or strong evidence? | How many words are in the passage? |
+| Is this request low, medium, or high urgency? | Which date comes first? |
+
+## Define Ordered Score Levels
+
+Every level should represent a meaningful state, not merely a number with an unexplained label. Add observable boundaries so two reviewers would classify the same example similarly.
+
+| Level | Example: support urgency |
+| --- | --- |
+| 1 | General question with no service impact and no deadline |
+| 2 | Important request but the service remains usable |
+| 3 | Partial feature failure affecting a small group |
+| 4 | Broad outage or time-sensitive business impact |
+| 5 | Safety, security, or severe operational incident |
+
+If the workflow does not need an ordered scale, use Choice or Noul instead. Adding fake precision to a Score question makes the output harder to evaluate.
+
+TypeSafe's primitive documentation requires at least two ordered levels and supports up to ten criteria in the API request. Use the smallest scale that separates the actions your workflow actually needs. A three-level rubric is often easier to label consistently than a ten-level rubric with vague differences between adjacent values.
+
+Write the criteria in the order the answer should use them, from the lowest state to the highest state. Keep the wording parallel and observable. “Calm,” “somewhat bad,” and “severe” are difficult to reproduce; “asks for information,” “reports a blocked task,” and “reports a broad outage” give reviewers evidence they can inspect.
+
+### Example: Score Customer Frustration
+
+```python
+from typesafe_sdk import Score, TypeSafeClient
+
+state = {
+    "ticket_message": (
+        "I have contacted support three times and the same invoice is still wrong. "
+        "Please fix this today."
+    )
+}
+
+question = Score(
+    instructions="How frustrated does the customer appear in `ticket_message`?",
+    criteria=[
+        "Calm and neutral; the customer asks for information without negative language.",
+        "Concerned; the customer describes a problem but remains measured.",
+        "Frustrated; the customer describes repeated failure or uses strong dissatisfaction.",
+        "Highly frustrated; the customer threatens escalation or uses hostile language.",
+    ],
+)
+
+with TypeSafeClient(model="jev-latest") as client:
+    response = client.system_one(
+        state=state,
+        questions={"frustration": question},
+    )
+
+answer = response.answers["frustration"]
+print(answer.score)
+print(answer.probabilities)
+print(answer.confidence)
+print(answer.legend)
+```
+
+The code shows the documented SDK pattern; the criteria and message are an example. Keep your production policy outside the prompt so the business rule remains reviewable.
+
+### Score Is a Semantic Scale, Not a Measurement Tool
+
+Suppose a Score question has five levels. A returned value between levels may help an application recognize a boundary, but it does not mean that the customer is precisely “3.4 angry” or that the result is an exact percentage.
+
+Use a Score result as a policy signal, not as an exact measurement:
+
+- Routing levels 4 and 5 to an escalation queue can be reasonable after evaluation because the boundary is an explicit application rule.
+- Treating `3.7` as an exact risk probability is unsafe because the scale is semantic, not a calibrated meter.
+- Comparing the same question over time can be useful if the model, criteria, and data conditions remain stable.
+- Adding two unrelated Score outputs is not meaningful unless both rubrics were deliberately designed to be commensurate.
+
+Use deterministic code for arithmetic and let Score provide the semantic signal that code cannot obtain from raw text.
+
+## Operate Score in a Real Workflow
+
+### Combine Score With Code
+
+A production workflow might use Score for language and ordinary fields for exact facts:
+
+1. Parse the ticket timestamp in code.
+2. Check service status from the monitoring system.
+3. Ask Jev to score the customer's expressed urgency.
+4. Apply a policy table that combines those signals.
+5. Escalate when the rule says the case is high impact or uncertain.
+
+| Signal | Owner |
+| --- | --- |
+| Customer tone and urgency expressed in text | Jev Score |
+| Account tier | Database lookup |
+| Outage duration | Monitoring system and code |
+| Escalation policy | Application code |
+| Final action | Application code plus human review where required |
+
+This separation prevents a model from becoming the hidden source of authority for a policy that should be explicit.
+
+### Choose Score Criteria That Reviewers Can Label
+
+Create a short annotation guide before tuning thresholds. Ask reviewers to label examples using the same level definitions, then compare Jev's distribution with the human labels.
+
+| Evaluation question | What to inspect |
+| --- | --- |
+| Are adjacent levels distinguishable? | Review disagreements around the boundary |
+| Is one level overused? | Check the output distribution by class |
+| Does irrelevant context change the score? | Run trimmed and full-state variants |
+| Does adversarial text change the score? | Add instruction-like and misleading examples |
+| Does the score move when the question changes? | Version the question and compare separately |
+
+TypeSafe's [Jev 1.13 jaggedness page](https://docs.typesafe.ai/model-jaggedness/jev-1.13) calls out literal reading, irrelevant context, adversarial content, and contradictory criteria as failure modes worth testing.
+
+For **Jev AI Score**, the most useful tests are usually the boundaries between adjacent levels. Add pairs that differ by one meaningful fact, such as a blocked task versus a completed task, and check whether the output moves in the expected direction without pretending that every change must produce a one-point jump.
+
+### Score Patterns for Common Workflows
+
+| Workflow | Example scale | Action after scoring |
+| --- | --- | --- |
+| Support | Calm → concerned → frustrated → severe | Escalate high levels |
+| RAG | Irrelevant → related → directly answers | Keep only the top evidence |
+| Content review | Safe → needs review → disallowed | Send the middle band to people |
+| Lead qualification | Weak fit → possible fit → strong fit | Request more data or route to sales |
+
+Do not use the labels as universal truth. Define them for the domain, test them on real examples, and keep an explicit fallback for unclear inputs.
+
+### Review the Distribution, Not Only the Average
+
+The returned score is a probability-weighted position across the levels. The accompanying `probabilities` and `legend` show whether that position is concentrated or split between adjacent interpretations. A score near a boundary deserves different treatment from a score with one clearly dominant level, even when the numeric value is similar.
+
+Read the returned fields together: `score` is the position on the ordered rubric, `legend` explains the meaning assigned to each level, `probabilities` shows how evidence is distributed, and `confidence` summarizes how concentrated the answer is.
+
+Keep those fields together in logs and dashboards. Showing only the score makes later review difficult because the same position can arise from different probability distributions.
+
+This is especially important when **Jev AI Score** feeds a queue or moderation workflow. A reviewer needs to know whether the model selected a level decisively or landed there while splitting probability across neighboring levels.
+
+For example, two answers can both return a score of 3 while one has a concentrated probability around level 3 and the other is split between levels 2 and 4. The second case is a boundary case and should be more likely to enter review. That is why a production policy should record the complete answer object, not only the selected position.
+
+### Create a Score Change Policy
+
+Treat criteria edits as model behavior changes. If “high urgency” is rewritten to include a shorter outage, the historical score distribution is no longer directly comparable. Store the criteria version with each result, replay a fixed evaluation set, and compare both the selected levels and the review rate before releasing the change.
+
+When the rubric changes, keep old and new outputs side by side for a short shadow period when the workflow allows it. If the new rubric produces a large shift, inspect examples at the adjacent-level boundary first. The goal is not to force the old distribution to remain unchanged; it is to understand which business decisions will move and why.
+
+## Frequently Asked Questions
+
+### Is Jev AI Score a numeric prediction model?
+
+It returns a structured position on an ordered set, but the levels describe semantic categories. Do not use the result as an exact physical, financial, or statistical measurement without separate validation.
+
+### Should Score levels be numbers or words?
+
+Either can work, but descriptive levels are easier to review. Explain what each level means and what evidence separates it from adjacent levels.
+
+### Can Score replace a regression model?
+
+Not automatically. Score is useful for semantic judgments over text or structured state. A conventional regression or deterministic formula may be better for numeric prediction.
+
+### How do I choose the escalation threshold?
+
+Use labeled examples and the cost of false positives and false negatives. Treat the threshold as application policy, and retest it when the model version or question criteria change.

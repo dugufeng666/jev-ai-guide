@@ -1,0 +1,206 @@
+export const metadata = {
+  "title": "Jev AI Evaluation Guide: Thresholds, Tests, and Review",
+  "description": "Build a Jev AI evaluation set with labeled examples, threshold tests, adversarial cases, latency tracking, and human review metrics for real workflows.",
+  "category": "guide",
+  "date": "2026-09-25",
+  "lastModified": "2026-09-25",
+  "status": "draft"
+};
+
+## Why Jev AI Evaluation Matters
+
+Jev returns structured decisions quickly, but a valid Choice, Score, or Noul response can still be wrong for your workflow. **Jev AI evaluation** turns a promising demo into an observable system by comparing model decisions with labeled outcomes and the policy your application actually follows.
+
+The goal is not to find one universal confidence threshold. The goal is to measure where a question is reliable, where it needs review, and where deterministic code or another model should take over.
+
+Good **Jev AI evaluation** is therefore a workflow exercise, not a single accuracy number. It connects the question definition to the action taken after the answer and keeps uncertain or high-impact cases visible to people.
+
+Evaluate the workflow at five layers:
+
+- **Schema:** Did the API return the expected typed shape?
+- **Semantic quality:** Did the answer match the labeled outcome?
+- **Policy quality:** Did the application take the correct next action?
+- **Operations:** Was it fast, available, and within budget?
+- **Safety:** Did adversarial or sensitive input trigger the right fallback?
+
+## Build and Label the Evaluation Set
+
+### Start With a Decision Contract
+
+Before collecting examples, write down the contract for one workflow. Do not evaluate a broad “Jev assistant” with several unrelated decisions at once.
+
+| Contract field | Example |
+| --- | --- |
+| Decision | Route a support ticket to one queue |
+| Primitive | Choice |
+| Options | `technical`, `billing`, `sales`, `other` |
+| State | Ticket message and selected account metadata |
+| Automatic branch | Technical tickets with confidence at least 0.90 |
+| Review branch | Low confidence, `other`, or high-impact issue |
+| Ground truth | Final queue chosen by an experienced support agent |
+| Forbidden action | Never authorize refunds from the route alone |
+
+This contract separates model quality from business policy. A classifier can be semantically useful while the threshold or fallback rule is still unsafe.
+
+Write the contract before optimizing **Jev AI evaluation** metrics. Otherwise a higher score can hide a policy regression, such as routing more tickets automatically while also increasing expensive human overrides.
+
+### Build a Representative Evaluation Set
+
+Use real workflow examples after removing secrets and personal data. Include ordinary, ambiguous, and difficult cases rather than selecting only examples that make a demo look good.
+
+| Slice | What to include |
+| --- | --- |
+| Common | The highest-volume normal requests |
+| Boundary | Cases that human reviewers often disagree on |
+| Rare | Low-volume but costly or safety-sensitive cases |
+| Missing data | Incomplete, short, or contradictory state |
+| Adversarial | Prompt injection, misleading claims, and instruction-like text |
+| Distribution shift | New products, terminology, channels, or customer segments |
+
+For a first pass, a small set of 50–200 labeled examples can reveal question-design problems. Treat that size as a starting point, not a statistically complete certification.
+
+### Label the Outcome and the Action
+
+Store both what the answer should be and what the application should do. The two are not always identical.
+
+Store both the expected answer and the expected action. A useful record might contain `expected_choice: technical`, `expected_action: route to technical queue and mark outage`, `risk_level: high`, `human_notes: checkout failure affects all customers`, and `allowed_automation: route only; no account mutation`.
+
+If reviewers disagree, keep the disagreement visible. Do not force a single label simply to make the metric easier. Ambiguous examples are often the most valuable inputs for a review rule.
+
+## Measure and Tune Quality
+
+### Measure More Than Accuracy
+
+Accuracy is useful for balanced categories, but it can hide poor performance on rare or high-cost outcomes.
+
+| Metric | Useful for |
+| --- | --- |
+| Accuracy | Overall correctness when class balance is reasonable |
+| Per-class recall | Finding missed examples in each category |
+| Precision | Avoiding false positives in an automated branch |
+| Confusion matrix | Seeing which options are confused |
+| Abstention or review rate | Measuring how often the system asks for help |
+| Calibration by bucket | Comparing confidence bands with observed correctness |
+| Latency and cost | Understanding production tradeoffs |
+
+For Noul, group outputs into probability bands and compare the observed success rate in each band. For Choice, inspect the selected option, confidence, and probability gap between the top two options. For Score, inspect boundary disagreements and whether the scale is being used consistently.
+
+### Tune Thresholds With a Holdout Set
+
+Do not tune and report a threshold on the same examples. Split the data into development and holdout sets, then keep the holdout set untouched until the question and policy are fixed.
+
+| Dataset | Purpose |
+| --- | --- |
+| Development | Rewrite instructions, criteria, and options |
+| Validation | Compare threshold and fallback policies |
+| Holdout | Estimate behavior on unseen examples |
+| Monitoring stream | Detect drift after launch |
+
+A simple policy can make threshold changes explicit: automate a high-confidence, low-risk route; send the middle confidence band to human review; request clarification for `other` or missing information; and require deterministic checks and approval for high-impact actions regardless of confidence.
+
+The exact boundaries depend on the cost of errors. Never copy a threshold from a different question merely because both results are between 0 and 1.
+
+## Test and Monitor the Production Workflow
+
+### Test the Known Jev 1.13 Failure Modes
+
+TypeSafe's official [Jev 1.13 jaggedness documentation](https://docs.typesafe.ai/model-jaggedness/jev-1.13) lists failure modes that should become explicit test groups:
+
+- Literal interpretation and negation.
+- Counting and arithmetic.
+- Date and time comparison.
+- Indirect instructions and multi-hop reasoning.
+- Large state with irrelevant detail.
+- Adversarial content in the state.
+- Contradictory instructions and criteria.
+- Attempts to use Jev for generation.
+
+For each failure mode, create a positive example, a negative example, an ambiguous example, and a case that should be handed to code or a person.
+
+### Example Evaluation Record
+
+```json
+{
+  "case_id": "ticket-0042",
+  "question_version": "department-v3",
+  "model": "jev-1.13.0",
+  "expected_choice": "technical",
+  "actual_choice": "technical",
+  "confidence": 0.94,
+  "probabilities": {
+    "technical": 0.94,
+    "billing": 0.03,
+    "sales": 0.01,
+    "other": 0.02
+  },
+  "threshold": 0.9,
+  "action": "automatic_route",
+  "human_outcome": "technical",
+  "latency_ms": 214
+}
+```
+
+This is a storage example, not a fabricated benchmark. In production, populate the values from real API responses and reviewed outcomes. Keep sensitive state out of logs unless your privacy policy and retention controls allow it.
+
+### Monitor After Launch
+
+Evaluation does not finish at deployment. Track behavior by model version, question version, source channel, language, and workflow segment.
+
+| Signal | Warning sign |
+| --- | --- |
+| Review rate | Sudden increase after a content or product change |
+| `other` rate | New categories are missing from the option set |
+| Confidence distribution | More high-confidence errors or unusual flattening |
+| Latency | Provider or request size changes |
+| Human overrides | The policy is not matching operational reality |
+| Input language mix | Non-English performance changes as traffic grows |
+
+When an error appears, save the case, identify whether the problem was state selection, question wording, criteria, threshold, or application policy, then change one variable at a time.
+
+### Turn Failures Into New Test Cases
+
+Do not delete a failing example after fixing the prompt. Add it to a regression set with the original output, the reviewed outcome, the suspected cause, and the expected policy branch. The same case should be replayed against the old and new question versions when a change is proposed.
+
+For each regression case, capture:
+
+- The smallest state that still reproduces the failure.
+- The exact question, criteria, and model ID used at the time.
+- Whether the error was a wrong semantic judgment, a poor threshold, or an application bug.
+- The safe behavior expected from the workflow, including review or refusal.
+- The release that introduced the fix and the other cases checked before deployment.
+
+This turns production feedback into a durable **Jev AI evaluation** asset. It also prevents a common failure mode in which a prompt is tuned to one example while silently reducing performance on a different category. Run the full regression set whenever you change criteria, option names, thresholds, state construction, or model version.
+
+The strongest **Jev AI evaluation** suites remain small enough to run on every content or code change and broad enough to include the cases that caused real incidents.
+
+Keep the evaluation report close to the release artifact. A short report should identify the dataset version, question version, model ID, threshold policy, sample counts, review rate, and known exclusions. That context makes a later drop in traffic quality diagnosable instead of leaving the team to guess whether the cause was a model update, a product change, or a labeling decision.
+
+## Set Safe Automation Boundaries
+
+Use Jev as a decision aid, not as a blanket authorization layer. Pause automation when:
+
+- The workflow changes faster than the evaluation set can be updated.
+- Reviewers cannot agree on the labels or criteria.
+- High-confidence errors affect money, access, safety, or deletion.
+- The application cannot provide a useful fallback.
+- The state contains untrusted instructions that have not been tested.
+
+In those cases, keep the model result for ranking or triage and require a deterministic check or human decision for the final action.
+
+## Frequently Asked Questions
+
+### How many examples do I need for Jev AI evaluation?
+
+There is no universal number. Start with enough real examples to cover common, boundary, rare, missing-data, and adversarial cases, then grow the set whenever production reveals a new failure mode.
+
+### Should I optimize for accuracy or confidence?
+
+Measure both. Accuracy shows correctness, while confidence bands help you decide which cases can be automated and which should be reviewed.
+
+### Can I reuse a threshold across Noul, Choice, and Score?
+
+No. The primitives ask different questions and return different structures. Tune each question and policy against its own evaluation set.
+
+### What should happen when Jev is uncertain?
+
+Use an explicit fallback: human review, clarification, a safe default, or a deterministic rule. Do not silently convert uncertainty into an irreversible action.

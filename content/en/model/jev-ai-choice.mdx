@@ -1,0 +1,177 @@
+export const metadata = {
+  "title": "Jev AI Choice Guide: Routing With Fixed Options Safely",
+  "description": "Learn how Jev AI Choice selects defined options, how to design criteria and fallbacks, and how to route real workflows without parsing free text safely.",
+  "category": "model",
+  "date": "2026-09-25",
+  "lastModified": "2026-09-25",
+  "status": "draft"
+};
+
+## What Is Jev AI Choice?
+
+**Jev AI Choice** is the Jev primitive for selecting one option from a set that your application defines in advance. The response includes the selected choice, a probability for each option, and confidence in the selected option.
+
+Choice is useful when the next program action is an enum-like route: billing, technical support, sales, or a fallback queue. Because the options come from your request, the model cannot invent a new category in the response structure.
+
+The official API schema documents these fields and describes Choice as a selection from the criteria supplied with the question. In practice, read `choice` as the winning identifier, `probabilities` as the full distribution, `confidence` as the summary signal for the winner, and `type` as the typed answer discriminator.
+
+### Choice Versus Noul
+
+The difference is not just syntax. Choice asks a relative question: which available option fits best? Noul asks whether one proposition is supported. All Choice options may be weak fits, but Choice still returns the strongest available option unless you provide an explicit fallback.
+
+| Need | Use |
+| --- | --- |
+| Select one known destination | Choice |
+| Check whether one condition is true | Noul |
+| Let the workflow say “none of these” | Choice with `other` or `none_of_the_above` |
+| Run independent yes/no gates | Several Nouls |
+
+If every listed category is a poor fit, an explicit fallback is safer than assuming the top-ranked category is good enough.
+
+## Design Reliable Choice Criteria
+
+Choice criteria should be mutually understandable and collectively useful. Avoid labels that differ only by vague tone, such as `important`, `urgent`, and `very important`, unless you define observable boundaries.
+
+| Weak option set | Stronger option set |
+| --- | --- |
+| `bug`, `issue`, `problem` | `technical_outage`, `billing_question`, `account_request`, `other` |
+| `good`, `bad`, `okay` | `positive_feedback`, `negative_feedback`, `neutral_question`, `unclear` |
+| `fast`, `slow`, `medium` | `under_1_hour`, `same_day`, `multi_day`, `unknown` |
+
+Option names should be stable identifiers. Put the explanation in each criterion rather than depending on a label's informal meaning.
+
+### Example: Support Ticket Routing
+
+```python
+from typesafe_sdk import Choice, TypeSafeClient
+
+state = {
+    "ticket_message": (
+        "The checkout API returns a 502 for every order since 09:00 UTC. "
+        "Customers cannot complete payment."
+    )
+}
+
+question = Choice(
+    instructions="Which team should handle `ticket_message` first?",
+    criteria={
+        "billing": "Questions about invoices, charges, subscriptions, or payment records.",
+        "technical": "Software bugs, outages, API failures, integrations, or broken features.",
+        "sales": "Pricing, purchasing, plan selection, or product evaluation questions.",
+        "other": "The message does not fit the other routes or lacks enough information.",
+    },
+)
+
+with TypeSafeClient(model="jev-latest") as client:
+    response = client.system_one(
+        state=state,
+        questions={"department": question},
+    )
+
+answer = response.answers["department"]
+print(answer.choice)
+print(answer.confidence)
+print(answer.probabilities)
+```
+
+Keep routing and authorization separate. A `billing` choice can open a queue, but it should not itself approve a refund or change an account.
+
+### Treat the Option Set as a Contract
+
+For **Jev AI Choice**, the option set is part of the application interface. Changing a label, merging two categories, or removing `other` can change downstream routing even when the Python call still succeeds. Keep identifiers stable, store the human-readable criteria beside the code, and version both together.
+
+The official primitive supports a bounded list of options, with up to 255 choices. That limit is a reason to design a staged workflow rather than a single encyclopedic classifier. A first Choice can select a department, a second can select a queue inside that department, and ordinary code can handle the final permission or transaction check.
+
+Before changing a Choice question, review three artifacts together:
+
+- The option identifiers consumed by `switch` statements, queues, or database fields.
+- The criteria text used to define each option.
+- The labeled examples that justify the current fallback and confidence threshold.
+
+This keeps **Jev AI Choice** useful as a routing primitive instead of turning it into an undocumented taxonomy that only the model understands.
+
+In a production review, ask whether **Jev AI Choice** selected a valid destination and whether the application interpreted the result with the right fallback policy. Those are separate checks: a well-formed Choice answer can still be routed incorrectly by downstream code.
+
+### Handle Confidence and the Fallback Option
+
+Choice returns the best option even when the evidence is weak. Use both the selected option and confidence in your policy.
+
+| Result | Example action |
+| --- | --- |
+| `technical`, confidence 0.96 | Route automatically to the technical queue |
+| `billing`, confidence 0.71 | Route but mark for sampling or review |
+| `other`, confidence 0.88 | Ask for clarification or use a general queue |
+| Any choice, confidence 0.42 | Human triage before an automated action |
+
+The numbers above are illustrative. Select thresholds using labeled examples and the cost of each error. A false route may be cheap for a general inbox and expensive for a safety or financial workflow.
+
+## Route in Stages
+
+### Choice for Multi-Stage Routing
+
+Do not create a giant option list when the workflow has natural stages. First choose a broad route, then retrieve the relevant shortlist, then make a second Choice decision.
+
+| Stage | Question | Options |
+| --- | --- | --- |
+| 1 | Which department owns this request? | Billing, technical, sales, other |
+| 2 | Which queue inside the department? | Payment failure, duplicate charge, invoice, other |
+| 3 | Does it require a person? | Confidence threshold and deterministic policy |
+
+This approach keeps each question legible and makes evaluation errors easier to locate. It also prevents a single Choice question from mixing unrelated dimensions such as department, urgency, sentiment, and policy status.
+
+### When Choice Is a Poor Fit
+
+Use another tool when:
+
+- The answer is an exact number or date.
+- The option list changes on every request and can be computed deterministically.
+- The task requires writing a paragraph or code.
+- The categories are not defined well enough for a reviewer to label examples.
+- A wrong choice would execute an irreversible action without a second check.
+
+The official [Jev 1.13 limitations](https://docs.typesafe.ai/model-jaggedness/jev-1.13) specifically recommend keeping arithmetic, date comparison, and structural invariants in code.
+
+### Choice Evaluation Checklist
+
+Before shipping a Choice question, check:
+
+- Every option has a plain-language criterion.
+- An `other` or `none_of_the_above` path exists when the set is incomplete.
+- A human can label a representative test set without guessing.
+- Low-confidence results do not silently become high-impact actions.
+- The model ID, question version, selected choice, confidence, and final outcome are logged.
+- Adversarial text and contradictory examples are included in evaluation.
+
+For a large candidate set, use **Jev AI Choice** only after deterministic filtering has reduced the list. A product catalog can first remove unavailable items, a document system can filter by access permissions, and a browser agent can remove elements that are not actionable. The model should choose among valid candidates, not decide whether a forbidden candidate is acceptable.
+
+### Measure the Routing Boundary
+
+Do not evaluate only whether the selected label matches. Also measure how often the selected label clears the confidence threshold and how often people override an automatic route. A routing question can have good overall accuracy while still sending its most expensive errors to the wrong queue.
+
+| Review slice | Question to answer |
+| --- | --- |
+| High-confidence routes | Are automatic decisions actually correct? |
+| Low-confidence routes | Is the fallback catching ambiguous cases? |
+| `other` routes | Are important categories missing? |
+| Top-two ties | Are criteria overlapping or under-specified? |
+| Human overrides | Is the application policy too aggressive? |
+
+Version the option descriptions alongside the code that maps each label to a queue. When a category changes, evaluate old and new criteria separately rather than combining results under one unexplained metric.
+
+## Frequently Asked Questions
+
+### Can Jev AI Choice invent an option?
+
+The typed Choice response is constrained to the options supplied in the question. The application should still include an explicit fallback when the available set does not cover every possible input.
+
+### Should I use Choice or several Noul questions?
+
+Use Choice when you need the best option from a defined list. Use separate Nouls when each condition should be evaluated independently and it is valid for all, none, or several conditions to be true.
+
+### Does the top Choice always mean the model is confident?
+
+No. The top option can win even when all options are weak. Inspect confidence and probabilities, then define a review path for ambiguous cases.
+
+### Can I use Choice for ranking many items?
+
+Choice is best for a bounded shortlist. For a large candidate set, filter or score candidates in stages, then use Choice on a manageable final set.

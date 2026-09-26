@@ -1,0 +1,196 @@
+export const metadata = {
+  "title": "Jev AI Noul Guide: Boolean Decisions and Thresholds",
+  "description": "Learn how Jev AI Noul returns bounded yes-or-no probabilities, how to write precise conditions, and how to choose review thresholds safely in production.",
+  "category": "model",
+  "date": "2026-09-25",
+  "lastModified": "2026-09-25",
+  "status": "draft"
+};
+
+## What Is a Jev AI Noul Question?
+
+A **Jev AI Noul** question asks whether one clearly stated proposition is supported by the supplied state. The result is a value between 0 and 1, so application code can treat it as evidence for a bounded decision rather than as generated prose.
+
+The important detail is that Noul answers the condition you write. It does not infer a broader business policy from a short label. TypeSafe's documentation describes Jev as a model for typed decisions and recommends writing literal conditions with boundary cases in the question criteria.
+
+| Noul result | Practical interpretation | Typical code path |
+| --- | --- | --- |
+| Near 1 | The statement is strongly supported | Continue if the action is low risk |
+| Around 0.5 | The evidence is ambiguous | Ask for review or more information |
+| Near 0 | The statement is weakly supported | Use the negative or fallback branch |
+
+The probability is not a guarantee of truth, and it is not a replacement for authorization, arithmetic, or a deterministic database check.
+
+## Design a Noul Decision
+
+Use **Jev AI Noul** when the application needs one semantic gate:
+
+- Does this email explicitly request a refund?
+- Does this passage contain evidence for the claim?
+- Does this tool request attempt a destructive operation?
+- Does this support message describe an active outage?
+- Is this candidate record the same entity as the reference record?
+
+Do not use **Jev AI Noul** for a list of mutually exclusive destinations. Use [Choice](https://docs.typesafe.ai/primitives) when the application must select one option from a fixed set. Do not use it for exact counts, date ordering, or calculations; the Jev 1.13 limitations page recommends keeping those operations in code.
+
+| Requirement | Better fit |
+| --- | --- |
+| One proposition is true or false | Noul |
+| Pick one department from a known list | Choice |
+| Place an item on an ordered scale | Score |
+| Count, add, compare timestamps, enforce permissions | Deterministic code |
+
+### Write a Precise Noul Instruction
+
+Weak questions hide the decision boundary:
+
+> Is this customer angry?
+
+A stronger question defines the observable condition:
+
+> Does `ticket_message` contain a direct request for a refund for a charged transaction? Ignore general dissatisfaction unless the customer asks for money back.
+
+The second version tells Jev what evidence matters and what should not count. It also gives the application a condition that can be tested against labeled examples.
+
+Build the question from a small set of explicit components:
+
+- **State field:** `ticket_message`
+- **Proposition:** the customer explicitly requests a refund
+- **Positive boundary:** “Please refund the duplicate charge”
+- **Negative boundary:** “I am unhappy with the price” without a refund request
+- **Fallback:** review when the message is unclear
+
+Keep the instruction focused on one judgment. If a single question contains routing, urgency, policy interpretation, and sentiment, split it into several questions and combine the answers in code.
+
+### Example: Refund Triage
+
+The following example uses the official Python client shape shown in TypeSafe's primitives documentation. The message and threshold are tutorial examples; tune them with your own labeled data.
+
+```python
+from typesafe_sdk import Noul, TypeSafeClient
+
+state = {
+    "ticket_message": "I was charged twice for the same order. Please refund one of the charges.",
+    "order_status": "fulfilled",
+}
+
+question = Noul(
+    instructions=(
+        "Does `ticket_message` explicitly request a refund for a charge? "
+        "Do not infer a refund request from dissatisfaction alone."
+    )
+)
+
+with TypeSafeClient(model="jev-latest") as client:
+    response = client.system_one(
+        state=state,
+        questions={"refund_request": question},
+    )
+
+probability = response.answers["refund_request"].noul
+
+if probability >= 0.90:
+    route = "refund_review"
+elif probability >= 0.60:
+    route = "human_triage"
+else:
+    route = "standard_support"
+```
+
+The threshold is an application decision, not a universal Jev setting. A refund workflow should also verify the order, payment status, customer identity, and policy in ordinary code before any money movement occurs.
+
+### Write Criteria for Both Outcomes
+
+When a question has a meaningful boundary, describe what counts as true and what counts as false. This makes annotation easier and reduces the chance that reviewers silently apply different interpretations.
+
+```python
+question = Noul(
+    instructions="Does `ticket_message` explicitly request a refund for a charged transaction?",
+    criteria={
+        "true": "The customer directly asks for money back for a charge or order.",
+        "false": "The customer is dissatisfied but does not request a refund.",
+    },
+)
+```
+
+The criteria are not a substitute for a policy document. They are a compact decision contract that tells Jev what evidence belongs on each side of the boundary. Keep policy exceptions in application code when they depend on account status, dates, permissions, or transaction history.
+
+### Batch Independent Noul Questions
+
+If a workflow needs several semantic gates over the same state, send them as separate named questions rather than combining them into one compound proposition. For example, a support ticket can be evaluated for `refund_request`, `active_outage`, and `security_signal` in one request. The questions remain independent, so the application must decide how their answers interact.
+
+This pattern is useful because it preserves observability. A reviewer can see which gate was uncertain, instead of receiving one opaque answer that mixes urgency, sentiment, and policy. It also lets you change one question without silently changing the meaning of the others. Log each question version and threshold separately.
+
+### Use Noul With Deterministic Checks
+
+Noul is useful for semantic interpretation, while code should own exact facts. This division makes failures easier to inspect.
+
+| Task | Jev Noul | Code |
+| --- | --- | --- |
+| Detect whether a message requests a refund | Yes | No |
+| Check whether the order is within 30 days | No | Yes |
+| Calculate the refundable amount | No | Yes |
+| Decide whether a human should review ambiguity | Provide probability | Apply policy |
+| Authorize a payment reversal | No | Yes |
+
+For a long message, filter irrelevant fields before the request. TypeSafe documents that large state with unrelated detail can reduce accuracy, and that adversarial text inside state can influence a decision.
+
+## Operate Noul Safely
+
+### Thresholds and Human Review
+
+Start with a small labeled evaluation set rather than choosing a threshold because it “looks confident.” Record both the Noul probability and the final human or business outcome.
+
+| Probability band | Suggested starting policy |
+| --- | --- |
+| 0.90–1.00 | Automatic low-risk routing, subject to deterministic checks |
+| 0.70–0.89 | Queue for sampling or secondary validation |
+| 0.30–0.69 | Human review or clarification |
+| 0.00–0.29 | Negative branch, unless the action is consequential |
+
+These bands are examples, not benchmark results. A fraud, safety, deletion, or financial workflow should use stricter controls and should never rely on a single model result as authorization.
+
+### Noul Limitations to Test
+
+The official [Jev 1.13 jaggedness documentation](https://docs.typesafe.ai/model-jaggedness/jev-1.13) identifies several risks relevant to **Jev AI Noul**:
+
+- Literal wording, especially negation and implied conditions.
+- Numeric precision, counting, and date comparison.
+- Indirect instructions that require multiple reasoning hops.
+- Irrelevant context in a large state.
+- Adversarial or instruction-like text inside user content.
+- Contradictory instructions and criteria.
+
+Create test examples for each risk. A robust Noul integration should log the question version, model version, state identifier, probability, threshold, selected branch, and final review outcome.
+
+### A Practical Review Record
+
+For each decision, keep a compact record that explains what happened without exposing more customer data than necessary. The record should identify the question version, the model ID returned by the service, the probability, and the policy branch. If a reviewer overrides the branch, store the reviewed outcome and a short reason.
+
+| Field | Why it matters |
+| --- | --- |
+| Question version | Shows which wording and criteria produced the result |
+| Model ID | Separates alias changes from stable model behavior |
+| Noul value | Preserves the original signal instead of only the branch |
+| Policy threshold | Makes the automatic decision reproducible |
+| Review outcome | Supplies a labeled example for future evaluation |
+
+This record also helps separate model errors from application errors. A correct semantic judgment can still lead to the wrong action if the threshold, permission check, or database lookup is wrong. Review those layers separately.
+
+## Frequently Asked Questions
+
+### Does Jev AI Noul return true or false?
+
+No. A Noul answer returns a probability-like value between 0 and 1. Your application decides how that value maps to a branch, review queue, or fallback.
+
+### Is a Jev AI Noul probability calibrated for every workflow?
+
+No. Treat calibration as something to verify on representative data. Thresholds tuned for one question should not automatically be reused for another question or primitive.
+
+### Can Noul replace a rules engine?
+
+No. Use Noul for semantic judgments and use ordinary code for exact rules, authorization, calculations, and irreversible actions.
+
+### Can I ask several Noul questions at once?
+
+Yes. Questions that evaluate the same state can be sent together. They remain independent, so combine their answers explicitly in application code.
