@@ -114,6 +114,8 @@ The classes, method, arguments, and response fields above follow the documented 
 
 This request demonstrates an important optimization: questions sharing the same state can be sent together. TypeSafe says Jev evaluates them independently and in parallel. Adding a question does not make an earlier question depend on its answer, so the application remains responsible for combining results.
 
+Once this basic request works, continue with the focused [Jev AI Choice guide](/model/jev-ai-choice), [Jev AI Score guide](/model/jev-ai-score), and [Jev AI Noul guide](/model/jev-ai-noul) before wiring the response into a production policy.
+
 | Step | Developer responsibility | Jev responsibility |
 | --- | --- | --- |
 | 1. Prepare state | Select relevant text or structured fields | Evaluate only the supplied state |
@@ -148,6 +150,8 @@ The following practices summarize the recommended workflow:
 4. Describe boundary cases in the criteria.
 5. Combine independent dimensions in code.
 6. Evaluate uncertain cases and adversarial inputs before deployment.
+
+For a repeatable test set and threshold policy, use the [Jev AI evaluation guide](/guide/jev-ai-evaluation). For evidence-heavy applications, the [Jev AI RAG source filtering guide](/community/jev-ai-rag-source-filtering) shows how to keep retrieval judgments separate from generation.
 
 The LangChain article describes another supported route through `TypeSafeClassifier`. It also presents experimental middleware examples for model routing and pre-execution tool-call checks. Those are specialized integrations rather than requirements for a first Jev application; start with a small classification workflow before adding Jev to an agent loop. See LangChain's [guide to building a harness with Jev](https://www.langchain.com/blog/building-a-harness-with-jev) for that integration.
 

@@ -1,0 +1,185 @@
+export const metadata = {
+  "title": "Jev AI Skill Routing: Choose Tools Safely in Agents",
+  "description": "Learn how Jev AI skill routing selects from bounded tools, handles none-of-the-above cases, separates judgment from execution, and escalates safely.",
+  "category": "agent",
+  "date": "2026-09-27",
+  "lastModified": "2026-09-27",
+  "status": "draft"
+};
+
+## What Is Jev AI Skill Routing?
+
+Jev AI skill routing is a pattern for choosing one skill, tool, plugin, or workflow from a known candidate list. The agent supplies the current task and a compact catalog; Jev returns a typed choice or a safe “use none” result; application code then validates and executes the selected skill.
+
+The [TypeSafe skill suggestion cookbook](https://docs.typesafe.ai/cookbooks/skill_suggestion.md) describes this kind of two-stage selection: filter a large skill catalog, then inspect a smaller set of candidates before deciding which skill fits. The model makes the bounded judgment. It does not install, authorize, or execute the skill.
+
+| Stage | Responsibility | Output |
+| --- | --- | --- |
+| Task parsing | Agent or application | Normalized task and constraints |
+| Catalog filtering | Code, search, or a first classifier | Candidate skill IDs |
+| Skill judgment | Jev | Selected skill, confidence, or none |
+| Permission check | Application code | Allowed or blocked |
+| Execution | Tool runner | Result, error, or review request |
+| Post-run review | Jev, scanner, or human | Safe to use, revise, or escalate |
+
+This separation prevents a common design mistake: giving a model a list of tools and treating its selected name as permission to run anything.
+
+## Build a Skill Catalog That Can Be Judged
+
+The model cannot choose well from a catalog with vague or overlapping descriptions. Each candidate needs a stable ID and a concise contract.
+
+| Catalog field | Example |
+| --- | --- |
+| `skill_id` | `summarize_release_notes` |
+| `purpose` | Summarize approved release notes for an internal update |
+| `inputs` | Release-note text and audience |
+| `outputs` | Draft summary with source references |
+| `side_effects` | None; read-only |
+| `permissions` | Repository read access |
+| `exclusions` | Cannot publish or modify repository files |
+| `version` | `2.1.0` |
+
+Keep descriptions mutually exclusive where possible. “Search documents” and “retrieve evidence for a claim” may overlap unless their output and stopping conditions are distinct. Include `none_available` or `needs_clarification` when the catalog may not contain a safe match.
+
+Do not send secrets, private credentials, or an entire plugin manifest if the decision only needs a short capability description. Minimize state before it reaches the decision model.
+
+## Choice, Review, and None-of-the-Above
+
+Skill routing is a Choice problem when the application has a finite list of valid options. The option list should include a safe fallback rather than forcing the model to select the closest-looking skill.
+
+| Decision result | Meaning | Application action |
+| --- | --- | --- |
+| One skill, high confidence | Candidate appears to fit the declared task | Continue to permission checks |
+| One skill, narrow probability margin | Candidate is plausible but uncertain | Ask for clarification or review |
+| `none_available` | Catalog does not contain a suitable skill | Use a general fallback or stop |
+| `needs_clarification` | Task lacks required information | Ask the user a targeted question |
+| Provider failure | Decision did not complete | Retry or fail closed |
+
+Confidence is a routing signal, not an authorization. A high-confidence choice can still be wrong if the catalog is incomplete or the task state is misleading. For destructive, paid, privileged, or externally visible actions, require deterministic checks and often explicit approval regardless of confidence.
+
+## Two-Stage Routing for Large Catalogs
+
+Large catalogs make every candidate harder to describe and compare. A practical architecture uses two stages:
+
+1. Normalize the task and apply deterministic filters such as language, tenant, permissions, and input type.
+2. Retrieve a small candidate set using keyword, embedding, metadata, or a hybrid search.
+3. Ask Jev to choose among those candidates plus `none_available`.
+4. Load the selected skill’s full specification only after the choice.
+5. Recheck permissions, version, user confirmation, and side effects.
+6. Execute through a constrained runner and capture the result.
+
+The first stage should optimize candidate recall. The second stage should optimize decision clarity. Do not use a narrow candidate set as evidence that the selected skill is globally best; it is best only among the candidates the application supplied.
+
+## Python-Shaped Routing Example
+
+The following example illustrates the boundary between selection and execution. The exact client syntax should follow the current [TypeSafe primitives documentation](https://docs.typesafe.ai/primitives.md), while the permission and execution functions belong to the host application.
+
+```python
+catalog = [
+    {
+        "id": "summarize_release_notes",
+        "purpose": "Summarize approved release notes without changing files.",
+        "inputs": "Release-note text and audience",
+        "side_effects": "none",
+    },
+    {
+        "id": "find_repository_evidence",
+        "purpose": "Find source files and lines that support a technical claim.",
+        "inputs": "Repository path and claim",
+        "side_effects": "read-only",
+    },
+    {
+        "id": "none_available",
+        "purpose": "Use when no listed skill safely fits the task.",
+        "inputs": "Any",
+        "side_effects": "none",
+    },
+]
+
+decision = client.system_one(
+    state={"task": user_task, "constraints": task_constraints, "skills": catalog},
+    questions={
+        "skill": Choice(
+            instructions="Select the skill whose declared purpose and inputs best fit the task. Choose none_available when no candidate is safe.",
+            criteria=[skill["id"] for skill in catalog],
+        )
+    },
+)
+
+selected_id = decision.answers["skill"]["choice"]
+if selected_id == "none_available":
+    return request_clarification_or_fallback(user_task)
+
+skill = load_skill(selected_id)
+if not permission_policy.allows(user, skill, task_constraints):
+    return {"status": "blocked", "reason": "permission_policy"}
+
+return execute_in_sandbox(skill, user_task, task_constraints)
+```
+
+The example deliberately keeps `execute_in_sandbox` outside the model call. Jev can help select and review, but the application owns credentials, file paths, network access, rate limits, cancellation, and audit logs.
+
+## Guard Against Skill and Instruction Injection
+
+Skill metadata can contain text that looks like instructions. Treat catalog descriptions, repository files, tool output, and user content as data. Do not let a candidate description override the routing policy or expand its own permissions.
+
+Use layered controls:
+
+- Keep the routing instruction separate from catalog data.
+- Filter skills by permission before presenting them as candidates.
+- Use stable IDs rather than executable names supplied by users.
+- Validate the selected ID against an allowlist after the model response.
+- Load the selected skill’s full instructions only after permission checks.
+- Scan tool results before passing them into another agent step.
+- Require approval for payments, deletion, publishing, credential access, and deployment.
+- Log the task, candidate IDs, selected ID, policy decision, version, and result.
+
+For a fuller action boundary, see [Jev AI guardrails](/agent/jev-ai-guardrails). A routing model should not be the only security control around an agent.
+
+## Dependent Decisions Need Separate Requests
+
+Independent questions over one state can be batched. Dependent decisions should be sequenced in code.
+
+| Decision relationship | Recommended design |
+| --- | --- |
+| Choose a read-only research skill and classify urgency | One request can ask both |
+| Select a skill, then load its private configuration | First request, permission check, then second step |
+| Choose a tool, then generate options returned by that tool | Execute only after validation, then ask again |
+| Select a deployment target and approve production release | Separate selection and approval gates |
+
+This keeps the decision trace understandable. It also stops a later question from quietly depending on a result it never received as state.
+
+## Evaluate Routing as an Agent Workflow
+
+Track more than whether the selected skill name looks plausible.
+
+| Metric | What to inspect |
+| --- | --- |
+| Candidate recall | Was the correct skill in the supplied set? |
+| Selection accuracy | Did the model choose the approved skill? |
+| None precision | Did abstention happen when no candidate fit? |
+| Clarification rate | How often did missing task details stop execution? |
+| Permission-block rate | How often did policy correctly prevent a risky choice? |
+| Execution success | Did the selected skill complete its contract? |
+| Human override rate | Where did reviewers disagree? |
+| Side-effect incidents | Did a decision lead to an unauthorized action? |
+
+Create test slices for overlapping skills, missing skills, misleading descriptions, prompt injection, stale versions, permission boundaries, and high-impact actions. Keep a holdout set for evaluating catalog and criteria changes.
+
+## FAQ
+
+### Does Jev execute the selected Skill?
+
+No. Jev returns a typed decision from the supplied options. The host application must validate, authorize, run, cancel, and log the skill.
+
+### Should I always include a none option?
+
+Include a safe fallback whenever the candidate catalog may be incomplete or the cost of a wrong selection is meaningful. It prevents the router from being forced to choose an unrelated skill.
+
+### Can I use Jev to choose tools with side effects?
+
+It can provide a routing signal, but side effects need separate permission checks and policies. Payments, deletion, publishing, account changes, and deployment should not rely on model confidence alone.
+
+### What should I read next?
+
+For the broader agent loop, see [Jev AI agents](/agent/jev-ai-agents). For evidence-aware routing, read [Jev AI RAG source filtering](/community/jev-ai-rag-source-filtering).

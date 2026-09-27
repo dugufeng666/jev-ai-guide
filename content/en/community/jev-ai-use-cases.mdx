@@ -28,6 +28,8 @@ The most reusable pattern across the strongest public examples is a three-part d
 
 The useful boundary is whether the desired output can be specified before inference. If your application needs one of several known labels, a numerical assessment, or a probability that a condition is true, Jev may fit. If the output must be newly written text, it does not.
 
+For implementation details, start with the [Jev AI beginner guide](/guide/jev-ai-beginner-guide), then use the [Jev AI evaluation guide](/guide/jev-ai-evaluation) to test thresholds and review behavior. The newer [Jev AI skill routing guide](/agent/jev-ai-skill-routing) covers one of the most useful agent-specific selection patterns.
+
 ## How Jev Represents Decisions
 
 Understanding Jev AI use cases starts with its input and output model. An application supplies a state, which can be text, structured data, or LangChain messages. It also supplies one or more questions describing the decisions it needs.
@@ -119,6 +121,8 @@ The source also presents an Auto Mode pattern for checking potentially risky act
 This is a pre-execution decision layer, not proof that an agent is secure. The source explicitly describes agents as inherently untrustworthy and notes that bad or adversarial instructions can push them toward unwanted actions.
 
 A classifier can add a checkpoint, but the supplied evidence does not show that it catches every dangerous request. Authentication, authorization, tool restrictions, sandboxing, logging, and human approval for consequential actions remain outside the demonstrated Jev behavior.
+
+For a more complete evidence and safety chain, pair this pattern with [Jev AI RAG source filtering](/community/jev-ai-rag-source-filtering) before generation and [Jev AI citation verification](/community/jev-ai-citation-verification) after source-backed claims are written.
 
 ### Community-reported projects
 

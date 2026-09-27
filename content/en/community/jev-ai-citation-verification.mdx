@@ -1,0 +1,191 @@
+export const metadata = {
+  "title": "Jev AI Citation Verification: Match Claims to Evidence",
+  "description": "Learn how to use Jev AI for citation verification by matching claims to evidence, checking missing support, handling conflicts, and routing review safely.",
+  "category": "community",
+  "date": "2026-09-27",
+  "lastModified": "2026-09-27",
+  "status": "draft"
+};
+
+## What Is Jev AI Citation Verification?
+
+Jev AI citation verification is a workflow for checking whether a source passage supports a written claim. It is useful for research notes, GEO content, reports, documentation, and long-form answers where a fluent sentence is not enough. The application supplies the claim and one or more candidate evidence passages; Jev returns a bounded judgment that code combines with deterministic checks.
+
+The [TypeSafe citation check cookbook](https://docs.typesafe.ai/cookbooks/citation_check.md) demonstrates the core separation: use a decision model to judge the support relationship, then use code to verify that the citation exists and is attached to the right source. Jev does not replace a bibliography, a URL checker, or a human editor.
+
+| Layer | Question | Suitable owner |
+| --- | --- | --- |
+| Claim extraction | What statements need support? | Code, parser, or generative model |
+| Citation lookup | What sources are attached? | Code and document store |
+| Support judgment | Does the evidence support the claim? | Jev |
+| URL and metadata checks | Does the source exist and match the record? | Code |
+| Editorial decision | Is the wording proportionate to the evidence? | Human or policy code |
+
+The most common mistake is asking “is this citation good?” without defining what good means. A citation can be real but unrelated, related but only partially supportive, or supportive for an older version of the claim. Make those distinctions explicit.
+
+## Define the Claim-Evidence Contract
+
+Before calling Jev, normalize each claim into a record. Keep the original sentence for editorial context, but also store a concise proposition and the expected evidence relationship.
+
+| Field | Example |
+| --- | --- |
+| `claim_id` | `pricing-014` |
+| `claim_text` | “The API accepts multiple independent questions.” |
+| `source_id` | `typesafe-primitives-docs` |
+| `source_excerpt` | Relevant paragraph from the official page |
+| `relationship` | Supports, partially supports, contradicts, or unrelated |
+| `source_version` | Document date or retrieved timestamp |
+| `risk_level` | Low, medium, or high |
+
+Do not ask Jev to infer whether the prose is “well written” and “factually correct” in one question. These are different decisions. A sentence may be clear but overstate the source. Another may be well supported but too vague for the reader.
+
+## Use a Closed Relationship Set
+
+A useful citation checker has an explicit abstention or review state. A binary supported/not-supported answer often hides partial support and contradictions.
+
+| Relationship | Meaning | Suggested action |
+| --- | --- | --- |
+| `supports` | Evidence directly supports the claim as written | Keep, subject to source checks |
+| `partial` | Evidence supports only part or needs narrower wording | Rewrite or send to review |
+| `contradicts` | Evidence conflicts with the claim | Block publication until resolved |
+| `unrelated` | Evidence does not address the claim | Find a better source |
+| `unclear` | Evidence or claim is ambiguous | Human review |
+
+The choices must be mutually understandable to reviewers. “Supports” should not include a source that merely mentions the same keyword. Criteria should explain whether the evidence must state the fact directly, whether reasonable inference is allowed, and how much qualification the claim must retain.
+
+## Check the Citation in Code
+
+Jev can judge semantic support, but code should verify mechanical facts around the citation.
+
+| Check | Why it matters |
+| --- | --- |
+| URL resolves or has an accepted archived status | Prevents dead references |
+| Citation ID exists in the source registry | Prevents dangling references |
+| Quoted excerpt belongs to the cited source | Prevents mismatched evidence |
+| Source title and publisher match metadata | Prevents accidental substitutions |
+| Retrieved date is stored | Makes freshness review possible |
+| Access permissions are valid | Prevents leaking private evidence |
+| Claim version matches review version | Prevents stale approvals |
+
+A passing URL check does not make a claim supported. Conversely, a source that is temporarily unavailable should not automatically become a semantic contradiction. Keep `source_unavailable`, `unrelated`, and `contradicts` as separate statuses.
+
+## A Practical Verification Flow
+
+The following flow combines a bounded model decision with deterministic source checks:
+
+1. Extract claims from the draft and assign stable IDs.
+2. Resolve each citation to a source record and evidence excerpt.
+3. Reject missing IDs before calling the model.
+4. Ask Jev for the relationship between the claim and evidence.
+5. Apply source URL, version, permission, and freshness checks in code.
+6. Rewrite partial claims or route them to an editor.
+7. Block contradictions and unsupported high-risk claims.
+8. Store the decision, source excerpt, model version, criteria version, and reviewer outcome.
+
+The model should receive the claim and evidence as data. Do not allow text inside the evidence excerpt to redefine the checker’s policy or instruct it to ignore the claim.
+
+## Python-Shaped Example
+
+This example shows the boundary between semantic classification and source registry checks. The client syntax follows the documented [TypeSafe primitives interface](https://docs.typesafe.ai/primitives.md); the claim text and policy are illustrative.
+
+```python
+claim = {
+    "id": "api-014",
+    "text": "Jev evaluates independent questions over shared state.",
+    "source_id": "typesafe-primitives",
+    "excerpt": source_registry["typesafe-primitives"]["excerpt"],
+}
+
+registry_record = source_registry.get(claim["source_id"])
+if not registry_record or not registry_record["url"]:
+    return {"status": "missing_source", "claim_id": claim["id"]}
+
+state = {
+    "claim": claim["text"],
+    "evidence": claim["excerpt"],
+    "source_title": registry_record["title"],
+}
+
+answer = client.system_one(
+    state=state,
+    questions={
+        "relationship": Choice(
+            instructions="Classify how the evidence relates to the claim.",
+            criteria=["supports", "partial", "contradicts", "unrelated", "unclear"],
+        )
+    },
+)
+
+relationship = answer.answers["relationship"]["choice"]
+mechanical_ok = check_source_record(registry_record, claim)
+
+if relationship == "supports" and mechanical_ok:
+    return {"status": "approved_for_editor", "claim_id": claim["id"]}
+if relationship in {"contradicts", "unclear"}:
+    return {"status": "human_review", "claim_id": claim["id"]}
+return {"status": "rewrite_or_replace_source", "claim_id": claim["id"]}
+```
+
+Do not interpret `approved_for_editor` as “automatically publish.” A source-supported claim can still violate editorial policy, expose private information, or become stale before publication. The final status should reflect the workflow’s actual review boundary.
+
+## Partial Support Is a Writing Problem
+
+Many citation failures are not source failures. The draft claim is simply stronger or broader than the evidence.
+
+| Draft claim | Evidence | Better action |
+| --- | --- | --- |
+| “The model always avoids hallucinations.” | The source describes constrained output types | Rewrite to describe output-space constraints |
+| “Jev is faster for every workflow.” | One documented example reports lower latency | Limit the claim to the documented workflow |
+| “The API guarantees accuracy.” | The source documents request shape | Remove the accuracy guarantee |
+| “The system supports all languages equally.” | English is the primary training language | Add the documented language limitation |
+
+Use Jev to identify the support relationship, then let the editor or a policy layer choose wording. Do not ask the model to invent a softer sentence without preserving the original claim and evidence record.
+
+## GEO and Research Workflows
+
+Citation verification can help GEO and research teams, but it should not be presented as a ranking guarantee. A useful workflow can check whether a page’s claims are supported by cited source material, whether a brand mention is accurately represented, and whether a generated summary overreaches the evidence.
+
+For each claim, record:
+
+- The exact wording shown to readers.
+- The source that supports it.
+- The evidence excerpt and retrieval timestamp.
+- The relationship judgment and probabilities.
+- Any source freshness or conflict warning.
+- The reviewer decision and final wording.
+
+This makes a later correction possible. If a source changes, the system can identify affected claims instead of rechecking an entire site blindly.
+
+## Evaluation and Review Metrics
+
+Measure the checker as a workflow, not as a single model score.
+
+| Metric | What it reveals |
+| --- | --- |
+| Support precision | How often approved claims are actually supported |
+| Contradiction recall | Whether conflicting evidence is caught |
+| Partial-support rate | How often drafts overstate their sources |
+| Missing-source rate | Whether the citation registry is complete |
+| Mechanical check pass rate | Quality of URL and metadata records |
+| Human override rate | Where policy or criteria need improvement |
+| Time to resolution | Editorial cost of uncertain claims |
+
+Build a labeled set containing direct support, partial support, unrelated passages, contradictions, stale sources, and instruction-like evidence. Keep high-impact claims separate from low-risk explanatory text when choosing review thresholds.
+
+## FAQ
+
+### Can Jev verify that a citation URL is real?
+
+Not by itself. Jev can judge the relationship between supplied claim and evidence. Code should check URL resolution, source registry records, metadata, permissions, and freshness.
+
+### Can citation verification prove a claim is true?
+
+No. It can identify whether a supplied source supports the claim under declared criteria. Source authority and factual truth still require appropriate research and editorial review.
+
+### What should happen when the evidence only partly supports the sentence?
+
+Narrow the claim, replace the source, or send it to review. Do not silently label partial support as fully supported.
+
+### What should I read next?
+
+For retrieved evidence selection, see [Jev AI RAG source filtering](/community/jev-ai-rag-source-filtering). For measuring thresholds and review outcomes, continue with [Jev AI evaluation](/guide/jev-ai-evaluation).

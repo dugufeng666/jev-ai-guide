@@ -82,7 +82,11 @@ This creates a useful division of labor:
 
 The distinction between citation presence and citation support matters. An answer can include a real URL that does not support the sentence next to it. Conversely, a source may support the claim while the answer fails to cite it. GEO reporting should keep those failures separate.
 
+For a dedicated implementation pattern, see [Jev AI citation verification](/community/jev-ai-citation-verification). It separates the semantic support decision from URL, metadata, freshness, and source-registry checks.
+
 The [TypeSafe RAG cookbook](https://docs.typesafe.ai/cookbooks/classifying_rag_passages.md) adds another layer by evaluating passage relevance, contradiction, and prompt-injection risk before a model generates an answer. A Jev AI GEO pipeline can therefore score the evidence packet before generation, then check claim support afterward.
+
+The evidence gate is covered in more detail by [Jev AI RAG source filtering](/community/jev-ai-rag-source-filtering), including abstention, conflict handling, and permission boundaries.
 
 ## A Practical Jev AI GEO Workflow
 

@@ -143,6 +143,8 @@ Do not treat HTTP success as semantic correctness. A typed response can have the
 
 A reliable **Jev AI API** client therefore separates transport handling from semantic handling. First validate status, schema, and retry behavior; then apply the question-specific threshold, fallback, and authorization policy.
 
+For the first working request, follow the [Jev AI quickstart](/api/jev-ai-quickstart). If you are choosing between direct HTTP, SDKs, and provider routes, compare the [Jev AI integrations guide](/integrations) before committing to an adapter.
+
 The official SDK handles retries for some transient failures, but a direct HTTP client still needs an explicit policy for `429`, `529`, timeouts, and connection failures. Do not retry a malformed `422` request unchanged. Use jittered exponential backoff, cap the total retry time, and send the case to a safe fallback when the budget is exhausted.
 
 ### Production Logging Checklist
@@ -158,6 +160,8 @@ For every decision, log enough information to reproduce and review the policy wi
 - Latency, token usage, retry count, and error category.
 
 The model page documents a 64k total request context and a 32k limit for state plus the longest question for Jev 1.13. The same page notes that rate limits may change, so operational settings should be monitored rather than hard-coded as permanent guarantees. Record token usage when it is returned, while enforcing your own input-size and cost limits before sending a request.
+
+When the API feeds a retrieval workflow, do not send every returned passage straight to a generator. Use [Jev AI RAG source filtering](/community/jev-ai-rag-source-filtering) to define the evidence gate, then use [Jev AI citation verification](/community/jev-ai-citation-verification) when the final answer makes source-backed claims.
 
 ### What Belongs Outside the API Call?
 

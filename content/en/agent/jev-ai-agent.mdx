@@ -45,6 +45,8 @@ A Jev AI agent can ask several questions about the same state in one request. La
 
 The important boundary is that probabilities are evidence for a policy decision, not the policy itself. Your application must still decide what probability or confidence is sufficient for automation, escalation, or rejection.
 
+For evidence-heavy agent turns, add a retrieval gate before routing with [Jev AI RAG source filtering](/community/jev-ai-rag-source-filtering). When a tool or skill must be selected from a larger catalog, use the dedicated [Jev AI skill routing guide](/agent/jev-ai-skill-routing).
+
 ## Build the Decision Layer with LangChain
 
 LangChain exposes Jev through the `langchain-typesafe` integration and its `TypeSafeClassifier` interface. The documented setup requires the package and a `TYPESAFE_API_KEY`, after which the application can pass state and questions to `classifier.invoke(...)`.
@@ -88,6 +90,8 @@ Another documented pattern is checking a proposed tool call before execution. La
 Guardrails require particular care. The [LangChain article](https://www.langchain.com/blog/building-a-harness-with-jev) explicitly notes that agents can receive harmful instructions and may attempt unintended actions. A classifier can add a useful checkpoint, but it should not be treated as a complete security boundary.
 
 For consequential tools, combine classification with conventional controls such as narrow permissions, tool allowlists, parameter validation, authentication, and human approval. Those controls are deterministic and remain enforceable even when a model is uncertain or wrong.
+
+The [Jev AI guardrails guide](/agent/jev-ai-guardrails) expands this pre-tool and post-tool boundary with prompt-injection checks, review paths, and fail-closed behavior.
 
 A community video also frames Jev as a complement to traditional code and generative models: computation goes to code, bounded judgment goes to Jev, and communication goes to an LLM. That is a useful architectural interpretation, but the video's performance figures and demonstrations should be treated as creator-reported context rather than independent verification. See the [community Jev explainer on YouTube](https://www.youtube.com/watch?v=47-u2is2fYA).
 
