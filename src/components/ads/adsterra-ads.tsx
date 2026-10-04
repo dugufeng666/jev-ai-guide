@@ -2,117 +2,85 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type DisplayZone = {
-  key: string;
-  width: number;
-  height: number;
-};
+type DisplayZone = { key: string; width: number; height: number };
 
 const DISPLAY_SCRIPT_DOMAIN = "www.highrevenueformat.com";
-const DESKTOP_DISPLAY_ZONE: DisplayZone = {
-  key: "3d4c8fdef84d7cafc13bd71259af9629",
-  width: 728,
-  height: 90,
-};
-const MOBILE_DISPLAY_ZONE: DisplayZone = {
-  key: "5a57fe79f61cc6bdf5a2c84c51360adc",
-  width: 300,
-  height: 250,
-};
+const zones = {
+  leaderboard: { key: "3d4c8fdef84d7cafc13bd71259af9629", width: 728, height: 90 },
+  banner: { key: process.env.NEXT_PUBLIC_ADSTERRA_468_KEY || "", width: 468, height: 60 },
+  rectangle: { key: "5a57fe79f61cc6bdf5a2c84c51360adc", width: 300, height: 250 },
+  railTall: { key: process.env.NEXT_PUBLIC_ADSTERRA_160X600_KEY || "", width: 160, height: 600 },
+  railShort: { key: process.env.NEXT_PUBLIC_ADSTERRA_160X300_KEY || "", width: 160, height: 300 },
+  sticky: { key: process.env.NEXT_PUBLIC_ADSTERRA_320X50_KEY || "", width: 320, height: 50 },
+} satisfies Record<string, DisplayZone>;
+
 const NATIVE_CONTAINER_ID = "container-f7368d5f793f0a39b99252143afca64f";
 const NATIVE_SCRIPT_SRC = "https://pl31453397.profitableratecpmnetwork.com/f7368d5f793f0a39b99252143afca64f/invoke.js";
 
-function SponsoredFrame({
-  children,
-  className = "",
-  label = "Sponsored",
-}: {
-  children: React.ReactNode;
-  className?: string;
-  label?: string;
-}) {
-  return (
-    <aside
-      className={`my-10 overflow-hidden rounded-2xl border border-border bg-card/50 p-3 text-center ${className}`}
-      aria-label="Sponsored content"
-    >
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-        {label}
-      </div>
-      {children}
-    </aside>
-  );
+function SponsoredFrame({ children, className = "", label = "Sponsored" }: { children: React.ReactNode; className?: string; label?: string }) {
+  return <aside className={`my-10 overflow-hidden rounded-2xl border border-border bg-card/50 p-3 text-center ${className}`} aria-label="Sponsored content"><div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">{label}</div>{children}</aside>;
 }
 
-function injectDisplayAd(container: HTMLDivElement, zone: DisplayZone) {
-  container.innerHTML = "";
-
-  const configScript = document.createElement("script");
-  configScript.text = `window.atOptions = ${JSON.stringify({
-    key: zone.key,
-    format: "iframe",
-    height: zone.height,
-    width: zone.width,
-    params: {},
-  })};`;
-
-  const invokeScript = document.createElement("script");
-  invokeScript.src = `https://${DISPLAY_SCRIPT_DOMAIN}/${zone.key}/invoke.js`;
-  invokeScript.async = true;
-
-  container.appendChild(configScript);
-  container.appendChild(invokeScript);
-}
-
-export function AdsterraResponsiveDisplayAd() {
+function DisplayAd({ zone, label = "Sponsored" }: { zone: DisplayZone; label?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [zone, setZone] = useState<DisplayZone | null>(null);
-
   useEffect(() => {
-    const query = window.matchMedia("(min-width: 768px)");
-    const updateZone = () => setZone(query.matches ? DESKTOP_DISPLAY_ZONE : MOBILE_DISPLAY_ZONE);
-
-    updateZone();
-    query.addEventListener("change", updateZone);
-    return () => query.removeEventListener("change", updateZone);
-  }, []);
-
-  useEffect(() => {
-    if (!ref.current || !zone) return;
-    injectDisplayAd(ref.current, zone);
+    if (!ref.current || !zone.key) return;
+    ref.current.innerHTML = "";
+    const config = document.createElement("script");
+    config.text = `window.atOptions = ${JSON.stringify({ key: zone.key, format: "iframe", height: zone.height, width: zone.width, params: {} })};`;
+    const invoke = document.createElement("script");
+    invoke.src = `https://${DISPLAY_SCRIPT_DOMAIN}/${zone.key}/invoke.js`;
+    invoke.async = true;
+    ref.current.append(config, invoke);
   }, [zone]);
+  if (!zone.key) return null;
+  return <SponsoredFrame label={label}><div className="mx-auto flex max-w-full justify-center overflow-hidden"><div ref={ref} style={{ width: zone.width, minHeight: zone.height }} /></div></SponsoredFrame>;
+}
 
-  return (
-    <SponsoredFrame>
-      <div className="mx-auto flex max-w-full justify-center overflow-hidden">
-        <div ref={ref} style={{ width: zone?.width ?? 300, minHeight: zone?.height ?? 90 }} />
-      </div>
-    </SponsoredFrame>
-  );
+export function AdsterraLeaderboardAd() { return <DisplayAd zone={zones.leaderboard} />; }
+export function Adsterra468Ad() { return <DisplayAd zone={zones.banner} />; }
+export function AdsterraRectangleAd() { return <DisplayAd zone={zones.rectangle} />; }
+
+export function AdsterraSidebarAd() {
+  const [zone, setZone] = useState<DisplayZone | null>(null);
+  useEffect(() => {
+    const update = () => setZone(window.matchMedia("(min-width: 1280px)").matches ? zones.railTall : zones.railShort);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  return zone ? <DisplayAd zone={zone} label="Sponsored" /> : null;
+}
+
+export function AdsterraStickyAd() {
+  const [open, setOpen] = useState(true);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open || !ref.current || !zones.sticky.key) return;
+    const config = document.createElement("script");
+    config.text = `window.atOptions = ${JSON.stringify({ key: zones.sticky.key, format: "iframe", height: 50, width: 320, params: {} })};`;
+    const invoke = document.createElement("script");
+    invoke.src = `https://${DISPLAY_SCRIPT_DOMAIN}/${zones.sticky.key}/invoke.js`;
+    invoke.async = true;
+    ref.current.append(config, invoke);
+  }, [open]);
+  if (!open || !zones.sticky.key) return null;
+  return <div className="fixed inset-x-0 bottom-0 z-[70] flex justify-center bg-background/90 px-2 py-1 shadow-[0_-4px_20px_rgba(0,0,0,0.2)] backdrop-blur"><div className="relative max-w-full"><span className="absolute -top-4 left-0 text-[9px] uppercase tracking-wider text-muted-foreground">Sponsored</span><div ref={ref} className="h-[50px] w-[320px] max-w-[calc(100vw-3rem)] overflow-hidden" /><button type="button" onClick={() => setOpen(false)} aria-label="Close advertisement" className="absolute -right-5 top-0 h-4 w-4 text-xs leading-none text-muted-foreground hover:text-foreground">×</button></div></div>;
 }
 
 export function AdsterraNativeAd() {
   const ref = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (!ref.current) return;
-
     const script = document.createElement("script");
     script.src = NATIVE_SCRIPT_SRC;
     script.async = true;
     script.setAttribute("data-cfasync", "false");
     ref.current.appendChild(script);
-
-    return () => {
-      script.remove();
-    };
+    return () => script.remove();
   }, []);
-
-  return (
-    <SponsoredFrame className="mt-12" label="More resources">
-      <div ref={ref} className="mx-auto max-w-full overflow-hidden">
-        <div id={NATIVE_CONTAINER_ID} />
-      </div>
-    </SponsoredFrame>
-  );
+  return <SponsoredFrame className="mt-12" label="More resources"><div ref={ref} className="mx-auto max-w-full overflow-hidden"><div id={NATIVE_CONTAINER_ID} /></div></SponsoredFrame>;
 }
+
+/** Kept for existing imports; new placements should use a named size. */
+export function AdsterraResponsiveDisplayAd() { return <AdsterraRectangleAd />; }

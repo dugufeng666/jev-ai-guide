@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TrailerButton, localizeHref } from "@/components/site";
-import { AdsterraResponsiveDisplayAd } from "@/components/ads/adsterra-ads";
+import { AdsterraLeaderboardAd, AdsterraNativeAd } from "@/components/ads/adsterra-ads";
 import type { ContentItem } from "@/lib/content";
 import en from "@/locales/en.json";
 
@@ -87,7 +87,7 @@ export default function HomePageClient({ home, locale, articles, recentArticles 
       </section>
 
       {/* One restrained placement after the first useful content block. */}
-      <AdsterraResponsiveDisplayAd />
+      <AdsterraLeaderboardAd />
 
       {/* Dynamic Content Section — auto-scrolling carousel */}
       {articles.length > 0 && (
@@ -124,6 +124,8 @@ export default function HomePageClient({ home, locale, articles, recentArticles 
           </div>
         </section>
       )}
+
+      <AdsterraNativeAd />
 
       {/* About Game (curated, stays in JSON) */}
       <section className="grid gap-8 rounded-3xl border border-border bg-card/60 p-6 lg:grid-cols-[1.1fr_0.9fr]"><div><h2 className="text-3xl font-bold tracking-tight text-foreground">{home.aboutGame.title}</h2>{home.aboutGame.paragraphs.map((p) => <p key={p} className="mt-5 leading-8 text-muted-foreground">{p}</p>)}<Button asChild className="mt-6"><Link href={localizeHref("/guide/jev-ai-beginner-guide", locale)}>{home.aboutGame.cta}</Link></Button></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-2">{home.aboutGame.stats.map((stat) => <div key={stat.label} className="rounded-2xl border border-border bg-background p-4"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{stat.label}</p><p className="mt-2 text-xl font-bold text-foreground">{stat.value}</p></div>)}</div></section>

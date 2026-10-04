@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { notFound } from "next/navigation";
 import { ThemeProvider } from "next-themes";
 import { JsonLd, SiteFooter, SiteHeader } from "@/components/site";
+import { AdsterraStickyAd } from "@/components/ads/adsterra-ads";
 import { routing } from "@/i18n/routing";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -52,6 +53,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
             <SiteHeader locale={locale} />
             {children}
             <SiteFooter locale={locale} />
+            <AdsterraStickyAd />
           </NextIntlClientProvider>
         </ThemeProvider>
       </body>
