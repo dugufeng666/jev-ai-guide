@@ -2,16 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type DisplayZone = { key: string; width: number; height: number };
+type DisplayZone = { key: string; width: number; height: number; scriptSrc: string };
 
-const DISPLAY_SCRIPT_DOMAIN = "www.highrevenueformat.com";
 const zones = {
-  leaderboard: { key: "3d4c8fdef84d7cafc13bd71259af9629", width: 728, height: 90 },
-  banner: { key: process.env.NEXT_PUBLIC_ADSTERRA_468_KEY || "", width: 468, height: 60 },
-  rectangle: { key: "5a57fe79f61cc6bdf5a2c84c51360adc", width: 300, height: 250 },
-  railTall: { key: process.env.NEXT_PUBLIC_ADSTERRA_160X600_KEY || "", width: 160, height: 600 },
-  railShort: { key: process.env.NEXT_PUBLIC_ADSTERRA_160X300_KEY || "", width: 160, height: 300 },
-  sticky: { key: process.env.NEXT_PUBLIC_ADSTERRA_320X50_KEY || "", width: 320, height: 50 },
+  leaderboard: { key: "3d4c8fdef84d7cafc13bd71259af9629", width: 728, height: 90, scriptSrc: "https://www.highrevenueformat.com/3d4c8fdef84d7cafc13bd71259af9629/invoke.js" },
+  banner: { key: "3939046193d92adc0c53374263354a3e", width: 468, height: 60, scriptSrc: "https://bicea.org/22/3939046193d92adc0c53374263354a3e" },
+  rectangle: { key: "5a57fe79f61cc6bdf5a2c84c51360adc", width: 300, height: 250, scriptSrc: "https://www.highrevenueformat.com/5a57fe79f61cc6bdf5a2c84c51360adc/invoke.js" },
+  railTall: { key: "7aee6c604af4a7106f372e54c911d539", width: 160, height: 600, scriptSrc: "https://bicea.org/22/7aee6c604af4a7106f372e54c911d539" },
+  railShort: { key: "952e6a1279eee64cfa843921c10605a2", width: 160, height: 300, scriptSrc: "https://bicea.org/22/952e6a1279eee64cfa843921c10605a2" },
+  sticky: { key: "3ef32bfa6e4620d78b1105074b04670c", width: 320, height: 50, scriptSrc: "https://bicea.org/22/3ef32bfa6e4620d78b1105074b04670c" },
 } satisfies Record<string, DisplayZone>;
 
 const NATIVE_CONTAINER_ID = "container-f7368d5f793f0a39b99252143afca64f";
@@ -29,7 +28,7 @@ function DisplayAd({ zone, label = "Sponsored" }: { zone: DisplayZone; label?: s
     const config = document.createElement("script");
     config.text = `window.atOptions = ${JSON.stringify({ key: zone.key, format: "iframe", height: zone.height, width: zone.width, params: {} })};`;
     const invoke = document.createElement("script");
-    invoke.src = `https://${DISPLAY_SCRIPT_DOMAIN}/${zone.key}/invoke.js`;
+    invoke.src = zone.scriptSrc;
     invoke.async = true;
     ref.current.append(config, invoke);
   }, [zone]);
@@ -60,7 +59,7 @@ export function AdsterraStickyAd() {
     const config = document.createElement("script");
     config.text = `window.atOptions = ${JSON.stringify({ key: zones.sticky.key, format: "iframe", height: 50, width: 320, params: {} })};`;
     const invoke = document.createElement("script");
-    invoke.src = `https://${DISPLAY_SCRIPT_DOMAIN}/${zones.sticky.key}/invoke.js`;
+    invoke.src = zones.sticky.scriptSrc;
     invoke.async = true;
     ref.current.append(config, invoke);
   }, [open]);
